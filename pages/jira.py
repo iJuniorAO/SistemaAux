@@ -141,15 +141,41 @@ def renderizar_board(df: pd.DataFrame):
     Renderiza o Quadro Kanban agrupando tarefas por colunas de status.
     """
 
-    if "loja" in df.columns and not df.empty:
-        todas_lojas = sorted([str(l) for l in df["loja"].dropna().unique()])
-        lojas_selecionadas = st.multiselect(
-            "Filtrar por Loja",
-            options=todas_lojas,
-            placeholder="Todas as lojas",
-        )
-        if lojas_selecionadas:
-            df = df[df["loja"].astype(str).isin(lojas_selecionadas)]
+    if not df.empty:
+        col_filtro, col_download = st.columns([3, 1], vertical_alignment="bottom")
+
+        with col_filtro:
+            if "loja" in df.columns:
+                todas_lojas = sorted([str(l) for l in df["loja"].dropna().unique()])
+                lojas_selecionadas = st.multiselect(
+                    "Filtrar por Loja",
+                    options=todas_lojas,
+                    placeholder="Todas as lojas",
+                )
+                if lojas_selecionadas:
+                    df = df[df["loja"].astype(str).isin(lojas_selecionadas)]
+
+        with col_download:
+            if "cod_produto" in df.columns:
+                codigos = [
+                    str(c).strip()
+                    for c in df[df["status"].isin(["Aberto", "Validação NFe"])][
+                        "cod_produto"
+                    ].dropna()
+                    if str(c).strip() and str(c).strip() != "-"
+                ]
+                txt_content = "\n".join(codigos)
+                # st.markdown(
+                #     "<div style='margin-top: 28px;'></div>", unsafe_allow_html=True
+                # )
+                st.download_button(
+                    label=":material/download: Baixar Cod Produtos (.txt)",
+                    data=txt_content,
+                    file_name="cod_produtos.txt",
+                    mime="text/plain",
+                    width="stretch",
+                    on_click="ignore",
+                )
 
     st.markdown(f"# :material/dashboard: Quadro :blue[({len(df)})]")
 
