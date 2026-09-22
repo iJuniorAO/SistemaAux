@@ -140,6 +140,17 @@ def renderizar_board(df: pd.DataFrame):
     """
     Renderiza o Quadro Kanban agrupando tarefas por colunas de status.
     """
+
+    if "loja" in df.columns and not df.empty:
+        todas_lojas = sorted([str(l) for l in df["loja"].dropna().unique()])
+        lojas_selecionadas = st.multiselect(
+            "Filtrar por Loja",
+            options=todas_lojas,
+            placeholder="Todas as lojas",
+        )
+        if lojas_selecionadas:
+            df = df[df["loja"].astype(str).isin(lojas_selecionadas)]
+
     st.markdown(f"# :material/dashboard: Quadro :blue[({len(df)})]")
 
     # Agrupa os cards diretamente em listas nativas (evita iterrows para alta performance)
