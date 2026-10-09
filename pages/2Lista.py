@@ -133,6 +133,7 @@ c1, c2 = st.columns(2)
 with c1:
     ind_neg = st.checkbox("[:material/Stat_Minus_1:]  Estoque Negativo", value=True)
     ind_div = st.checkbox("[:material/Safety_Divider:]  Divisão", value=True)
+    ind_loja = st.checkbox("[:material/Shopping_Bag:]  Loja", value=True)
 with c2:
     ind_grupo = st.pills(
         ":material/Group_Work: Grupo",
@@ -187,6 +188,11 @@ if (f_produto and f_extra) or desativa_manual:
                 "PESO"
             )
 
+        df["FAMILIA"] = "-"
+        df.loc[df["Fam"] == 900000007, "FAMILIA"] = "LISTA"
+        df.loc[df["Fam"] == 900000008, "FAMILIA"] = "DIVISAO"
+        df.loc[df["Fam"] == 900000009, "FAMILIA"] = "LOJA"
+
         df["TIPO"] = "SECO"
         df.loc[df["CodGrupo"].isin([9]), "TIPO"] = "CONG"
         df.loc[df["CodGrupo"].isin([14]), "TIPO"] = "REFR"
@@ -216,7 +222,7 @@ if (f_produto and f_extra) or desativa_manual:
         )
 
         remover_linhas = st.dataframe(
-            df[["CodProduto", "Descricao", "Fornecedor", "TIPO", "Estoq"]],
+            df[["CodProduto", "Descricao", "Fornecedor", "TIPO", "FAMILIA", "Estoq"]],
             hide_index=True,
             selection_mode="multi-row",
             on_select="rerun",
@@ -227,7 +233,7 @@ if (f_produto and f_extra) or desativa_manual:
         df_removido = df.drop(df.index[ind_remover_linhas]).copy()
 
         df_removido = df_removido[
-            ["CodProduto", "Descricao", "Fornecedor", "TIPO", "Estoq"]
+            ["CodProduto", "Descricao", "Fornecedor", "TIPO", "FAMILIA", "Estoq"]
         ]
         df_removido = df_removido.sort_values(by=["Fornecedor"])
 
