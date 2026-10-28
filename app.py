@@ -94,7 +94,6 @@ pages = {
     "Administrativo": [
         fazer_pedido_page,
         lanca_pedido_page,
-        lanca_rp_page,
         divisao_page,
         pedidos_page,
         calcula_nf_page,
@@ -110,6 +109,7 @@ pages = {
 
 if st.session_state.perfil.get("role") == "administrador":
     pages["Relatórios"] = [Faturamento, CMV, Evolucao_Vendas, resultados]
+    pages["Administrativo"].append(lanca_rp_page)
 
 # --- CONFIGURAÇÃO PAGINA ---
 pg = st.navigation(pages, position="top")

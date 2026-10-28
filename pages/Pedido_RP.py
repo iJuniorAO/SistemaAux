@@ -127,8 +127,15 @@ def encontra_melhor_match(descricao_erro, escolhas_base, threshold=60):
 )
 def carregar_lojas_banco_dados():
     try:
-        resposta = supabase.table("Lojas").select("Filial").order("Filial").execute()
-        return [loja["Filial"] for loja in resposta.data]
+        resposta = (
+            supabase.table("Lojas")
+            .select("Filial, cod_cliente_loja")
+            .order("Filial")
+            .execute()
+        )
+        return resposta
+    # resposta = supabase.table("Lojas").select("Filial").order("Filial").execute()
+    # return [loja["Filial"] for loja in resposta.data]
     except Exception as e:
         print(f"Erro ao buscar lojas: {e}")
         return []
@@ -198,7 +205,9 @@ def salvar_pedido_banco_dados(loja, tipo, pedido_erp, pedido_original, obs=None)
                 "hora_pedido": AGORA.strftime("%H:%M"),
                 "loja": loja,
                 "tipo_pedido": tipo,
-                "pedido_erp": pedido_erp.getvalue(),
+                # obsoleto - Usado na Alterdata
+                # "pedido_erp": pedido_erp.getvalue(),
+                "pedido_erp": pedido_erp,
                 "pedido_original": pedido_original.getvalue(),
                 "obs": obs,
             }
@@ -215,7 +224,25 @@ def salvar_pedido_banco_dados(loja, tipo, pedido_erp, pedido_original, obs=None)
         return st.info("Pedidos Atacado não são Salvo no Banco de Dados")
 
 
+def formata_pedido(df_sub, cod_cliente, doc_padrao):
+    prefixo = f"PV^{DDMMAA}^{doc_padrao}^{AAAAMMDD}{cod_cliente}^{SEGUNDOS}^"
+    sufixo = "^^0^400^000^^^V^^0.000^"
+
+    linhas_formatadas = []
+    for _, row in df_sub.iterrows():
+        df_formatado = "^".join(row.astype(str))
+        linha_completa = f"{prefixo}{df_formatado}{sufixo}"
+        linhas_formatadas.append(linha_completa)
+
+    conteudo_arquivo = "\n".join(linhas_formatadas)
+    return conteudo_arquivo
+
+
 AGORA = datetime.now()
+DDMMAA = AGORA.strftime("%d%m%y")
+AAAAMMDD = AGORA.strftime("%Y%m%dd")
+SEGUNDOS = str(AGORA.second)
+
 REGRAS_PRAZO = [
     ("tolerancia", time(10, 5), "red", "Timer_Off", "Prazo de Pedido Finalizado!"),
     (
@@ -298,6 +325,11 @@ st.set_page_config(page_title="Conversor de Pedidos", layout="wide")
 if st.session_state.get("debugger"):
     st.error(":material/Terminal: APP EM TESTE")
 
+with st.sidebar:
+    st.markdown("## Configurações: ")
+    doc_padrao = st.text_input("Documento Padrão", value="6101")
+
+
 # Inicialização do BD
 url = st.secrets["connections"]["supabase"]["url"]
 key = st.secrets["connections"]["supabase"]["key"]
@@ -321,7 +353,13 @@ with tab1:
     st.header("Upload de Bases de Dados")
     bd_automatico = st.toggle("Deseja pegar arquivos automaticamente?", value=True)
     if bd_automatico:
-        LOJAS = carregar_lojas_banco_dados()
+        dados_loja = carregar_lojas_banco_dados()
+
+        df_loja = pd.DataFrame(dados_loja.data)
+        df_loja = df_loja[["Filial", "cod_cliente_loja"]]
+
+        LOJAS = df_loja["Filial"]
+
         desativa_manual = True
 
         if "dados_onedrive" not in st.session_state:
@@ -387,7 +425,10 @@ if ((f_produto and f_extra) or desativa_manual) and f_pedido or f_pedido_atacado
     if not loja_pedido:
         st.error(":material/Priority_High: Selecione uma Loja")
         st.stop()
+
     # --- PROCESSAMENTO ---
+    cod_cliente = df_loja[df_loja["Filial"] == loja_pedido]["cod_cliente_loja"].iloc[0]
+
     if desativa_manual:
         df = abrir_arquivo_txt(f_produto_auto, colunas_produto)
         df_extra = abrir_arquivo_txt(f_extra_auto, colunas_produto_extra)
@@ -531,19 +572,29 @@ if ((f_produto and f_extra) or desativa_manual) and f_pedido or f_pedido_atacado
             ]
             with col:
                 if not df_sub.empty:
+
+                    conteudo_arquivo = formata_pedido(df_sub, cod_cliente, doc_padrao)
+
                     st.success(f"[{len(df_sub)}] Pedido {tipo} pronto!")
-                    # Gera o CSV em memória para download
-                    output = io.StringIO()
-                    df_sub.to_csv(output, sep="\t", index=False, header=False)
+                    # Obsoleto - usado na AlterData
+                    # output = io.StringIO()
+                    # df_sub.to_csv(output, sep="\t", index=False, header=False)
 
                     st.download_button(
                         label=f":material/Download: Baixar Pedido {tipo}",
-                        data=output.getvalue(),
+                        # obsoleto - usado na AlterData
+                        # data=output.getvalue(),
+                        data=conteudo_arquivo,
                         file_name=f"{AGORA.strftime("%Y%m%d_%HH%MM")}_{loja_pedido}_{tipo}.txt",
                         mime="text/plain",
                         on_click="ignore",
                     )
-                    salvar_pedido_banco_dados(loja_pedido, tipo, output, f_pedido)
+                    salvar_pedido_banco_dados(
+                        loja_pedido, tipo, conteudo_arquivo, f_pedido
+                    )
+                    # obsoleto - usado na AlterData
+                    # salvar_pedido_banco_dados(loja_pedido, tipo, output, f_pedido)
+
                 else:
                     st.info(f"Sem itens para {tipo}")
 
@@ -563,7 +614,9 @@ elif f_produto and f_extra and not f_pedido:
 else:
     st.info(":material/Warning: Aguardando o upload do arquivos iniciais para iniciar.")
 
+
 with st.sidebar:
+    st.markdown("## Lista de Produtos:")
     st.write(f"Produtos cadastrados: :blue[{produtos_cadastrados}]")
     with st.expander("Link para arquivo .txt"):
         st.subheader("Link para produto.txt:")
