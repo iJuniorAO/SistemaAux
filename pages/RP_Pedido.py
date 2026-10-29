@@ -170,9 +170,10 @@ def processar_pedidos(df, df_extra, df_Pedido_Loja):
     df["Codigo"] = df["CodProduto"].astype(str).str.rjust(13)
 
     # df_base = df[["Codigo", "Descricao", "CLASSE", "CONV"]].copy()
-    df_base = df[["Codigo", "Descricao", "CLASSE"]].copy()
+    # df_base = df[["Codigo", "Descricao", "CLASSE"]].copy()
 
-    df_Pedido_Final = df_base.merge(
+    # df_Pedido_Final = df_base.merge(
+    df_Pedido_Final = df.merge(
         df_Pedido_Loja[["QtCx", "Descricao"]],
         on="Descricao",
         how="outer",
@@ -197,7 +198,7 @@ def processar_pedidos(df, df_extra, df_Pedido_Loja):
         lambda x: f"{x:09.3f}".replace(".", ",")
     )
 
-    return df_Pedido_Final, df_Erro_Desc, df_base
+    return df_Pedido_Final, df_Erro_Desc, df
 
 
 def salvar_pedido_banco_dados(loja, tipo, pedido_erp, pedido_original, obs=None):
@@ -228,8 +229,8 @@ def salvar_pedido_banco_dados(loja, tipo, pedido_erp, pedido_original, obs=None)
 
 
 def formata_pedido(df_sub, cod_cliente, doc_padrao):
-    if not cod_cliente:
-        st.error("Não foi encontrado código do cliente")
+
+    df_sub = df_sub[["CodProduto", "PrecoUnPd", "Obs", "VALOR_STR"]].fillna("^")
     prefixo = f"PV^{DDMMAA}^{doc_padrao}^{AAAAMMDD}{cod_cliente}^{cod_cliente}^"
     sufixo = "^^0^512^^^^V^"
 
@@ -586,12 +587,14 @@ if ((f_produto and f_extra) or desativa_manual) and f_pedido or f_pedido_atacado
         else:
             st.header(f":blue[{loja_pedido}] - Baixar Pedidos Gerados")
 
+        if not cod_cliente:
+            st.error("Não foi encontrado código do cliente")
+
         c1, c2, c3 = st.columns(3)
         tipos = [("SECO", c1), ("CONG", c2), ("PESO", c3)]
+
         for tipo, col in tipos:
-            df_sub = df_Pedido_Final[df_Pedido_Final["CLASSE"] == tipo][
-                ["Codigo", "VALOR_STR"]
-            ]
+            df_sub = df_Pedido_Final[df_Pedido_Final["CLASSE"] == tipo]
             with col:
                 if not df_sub.empty:
 
