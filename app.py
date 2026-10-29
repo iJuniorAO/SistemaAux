@@ -58,6 +58,8 @@ lista_atacado_page = st.Page(
     "pages/3Atacado.py", title="Lista Atacado", icon=":material/local_mall:"
 )
 
+rp_lista_page = st.Page("pages/RP_Lista.py", title="RP Lista", icon=":material/list:")
+
 # financeiro
 previa_financeira_page = st.Page(
     "pages/6Previa_Financeira.py", title="Previa Financeira", icon=":material/wallet:"
@@ -110,6 +112,7 @@ pages = {
 if st.session_state.perfil.get("role") == "administrador":
     pages["Relatórios"] = [Faturamento, CMV, Evolucao_Vendas, resultados]
     pages["Administrativo"].append(lanca_rp_page)
+    pages["Lista"].append(rp_lista_page)
 
 # --- CONFIGURAÇÃO PAGINA ---
 pg = st.navigation(pages, position="top")

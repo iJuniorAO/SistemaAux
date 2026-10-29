@@ -43,6 +43,52 @@ def carregar_dados_onedrive(input_texto):
         return {"falha": True, "resp": None, "data": None}
 
 
+@st.cache_data(
+    ttl=7200, show_spinner="Carregando dados txt", show_time=True, scope="session"
+)
+def carregar_dados_onedrive_rp(input_texto):
+    try:
+        # 1. Limpeza: Se o usuário colou o <iframe>, extrai apenas a URL
+        url_match = re.search(r'src="([^"]+)"', input_texto)
+        url = url_match.group(1) if url_match else input_texto
+
+        # 2. Ajuste para SharePoint Business
+        if "sharepoint.com" in url:
+            if "embed.aspx" in url:
+                url = url.replace("embed.aspx", "download.aspx")
+            elif "download=1" not in url:
+                url = url + ("&" if "?" in url else "?") + "download=1"
+        else:
+            # Caso seja OneDrive Pessoal
+            url = url.replace("embed", "download")
+
+        # 3. Faz a requisição
+        response = requests.get(url, timeout=20)
+        response.raise_for_status()
+
+        # Garante a codificação correta para caracteres especiais/acentos
+        response.encoding = response.apparent_encoding or "utf-8"
+
+        # 4. Obtém a data de modificação no header da resposta
+        data_modificacao = response.headers.get("Last-Modified")
+
+        # 5. Processa o conteúdo em formato CSV
+        # O io.StringIO transforma o texto da resposta em um buffer de arquivo para o pandas
+        # Dica: altere sep=";" se o seu CSV usar ponto e vírgula como separador
+        df = pd.read_csv(io.StringIO(response.text), sep=None, engine="python")
+
+        return {
+            "falha": False,
+            "df": df,
+            "resp_raw": response.text,
+            "data": data_modificacao,
+        }
+
+    except Exception as e:
+        st.error(f"Erro ao processar URL: {e}")
+        return {"falha": True, "df": None, "resp_raw": None, "data": None}
+
+
 def converte_ultima_modificacao(data_string):
 
     formato = "%a, %d %b %Y %H:%M:%S %Z"
