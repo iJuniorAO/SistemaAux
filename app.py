@@ -23,6 +23,9 @@ fazer_pedido_page = st.Page(
 lanca_pedido_page = st.Page(
     "pages/1Lanca_Pedido.py", title="Lança Pedidos", icon=":material/add_shopping_cart:"
 )
+lanca_rp_page = st.Page(
+    "pages/Pedido_RP.py", title="Lança Pedidos RP", icon=":material/add_shopping_cart:"
+)
 divisao_page = st.Page(
     "pages/divisao.py", title="Divisão", icon=":material/prompt_suggestion:"
 )
@@ -106,6 +109,7 @@ pages = {
 
 if st.session_state.perfil.get("role") == "administrador":
     pages["Relatórios"] = [Faturamento, CMV, Evolucao_Vendas, resultados]
+    pages["Administrativo"].append(lanca_rp_page)
 
 # --- CONFIGURAÇÃO PAGINA ---
 pg = st.navigation(pages, position="top")
