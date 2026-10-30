@@ -35,12 +35,16 @@ with st.sidebar:
         link_produto = st.secrets["onedrive"]["links"]["produto"]
         link_produto_extra = st.secrets["onedrive"]["links"]["produto_extra"]
 
+    IMPLANTACAO = st.toggle("Implantação", value=True)
+
 
 # --- CONSTANTES ---
 AGORA = datetime.now()
 DDMMAA = AGORA.strftime("%d%m%y")
 AAAAMMDD = AGORA.strftime("%Y%m%d")
 SEGUNDOS = str(AGORA.second)
+# variavel de implantação será usada para caso seja utilizado o txt da AlterData e seja importado para o sistema da RP faça o devido tratamento
+
 
 REGRAS_PRAZO = [
     ("tolerancia", time(10, 5), "red", "Timer_Off", "Prazo de Pedido Finalizado!"),
@@ -143,6 +147,11 @@ def limpa_texto(uploaded_file):
         if linha.strip() != linha:
             linha = linha.strip()
 
+        if IMPLANTACAO:
+            if sistema == "RPOne":
+                if linha == linha.upper():
+                    linha = linha.title()
+
         colunas = linha.split()
         if len(colunas) >= 1 and not colunas[0].isdigit():
             sugestao = procuranumero(linha)
@@ -215,7 +224,9 @@ def confere_prazo_pedido():
 
 # FUNÇÃO UNIFICADA DE PROCESSAMENTO
 def processar_pedidos(df, df_extra, df_Pedido_Loja, sis_flag):
-    df = df[(df["Fam"] != 900000008) & (df["Estoq"] > 0)].copy()
+    # df = df[(df["Fam"] != 900000008) & (df["Estoq"] > 0)].copy()
+    # DEBBUG - retirado filtro para testes em produção utilizar o filtro acima
+    df = df[(df["Fam"] != 900000008)].copy()
 
     if sis_flag == "AlterData":
         df = df[["CodProduto", "CodGrupo", "Descricao", "Estoq", "Fam"]]
