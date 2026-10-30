@@ -7,7 +7,7 @@ import re
 from rapidfuzz import process, fuzz
 from datetime import datetime, time, timedelta, timezone
 from supabase import create_client, Client
-from utils import carregar_dados_onedrive, converte_ultima_modificacao
+from utils import carregar_dados_onedrive_rp, converte_ultima_modificacao
 
 #   MELHORIAS
 #
@@ -150,27 +150,30 @@ def confere_prazo_pedido():
 
 
 def processar_pedidos(df, df_extra, df_Pedido_Loja):
-    df = df[(df["Fam"] != 900000008) & (df["Estoq"] > 0)]
-    df = df[["CodProduto", "CodGrupo", "Descricao", "Estoq", "Fam"]]
 
-    df = df.merge(
-        df_extra[["CodProduto", "ListaCodCaract"]], on="CodProduto", how="left"
-    )
+    df = df[(df["Fam"] != 900000008) & (df["Estoq"] > 0)]
+    # df = df[["CodProduto", "TIPO", "Descricao", "Estoq", "Fam"]]
+
+    if df_extra:
+        df = df.merge(
+            df_extra[["CodProduto", "ListaCodCaract"]], on="CodProduto", how="left"
+        )
 
     CONDICOES = [
-        df["ListaCodCaract"].astype(str).str.contains("000002", na=False),
-        df["CodGrupo"].isin([9, 14]),
+        df["ListaCodCaract"].astype(str).str.contains("KG", na=False),
+        df["TIPO"].isin(["REFRIGERADO", "CONGELADO"]),
     ]
-    df["TIPO"] = np.select(CONDICOES, ["PESO", "CONG"], default="SECO")
+    df["CLASSE"] = np.select(CONDICOES, ["PESO", "CONG"], default="SECO")
 
     # ultimo = df["Descricao"].astype(str).str.split().str[-1]
     # df["CONV"] = np.where(ultimo.str.isdigit(), ultimo, 1).astype(float)
     df["Codigo"] = df["CodProduto"].astype(str).str.rjust(13)
 
-    # df_base = df[["Codigo", "Descricao", "TIPO", "CONV"]].copy()
-    df_base = df[["Codigo", "Descricao", "TIPO"]].copy()
+    # df_base = df[["Codigo", "Descricao", "CLASSE", "CONV"]].copy()
+    # df_base = df[["Codigo", "Descricao", "CLASSE"]].copy()
 
-    df_Pedido_Final = df_base.merge(
+    # df_Pedido_Final = df_base.merge(
+    df_Pedido_Final = df.merge(
         df_Pedido_Loja[["QtCx", "Descricao"]],
         on="Descricao",
         how="outer",
@@ -184,17 +187,18 @@ def processar_pedidos(df, df_extra, df_Pedido_Loja):
         df_Pedido_Final["Descricao"].astype(str).str.replace(",", ".")
     )
 
-    ultimo = df_Pedido_Final["Descricao"].astype(str).str.split().str[-1]
-    ultimo_numerico = pd.to_numeric(ultimo, errors="coerce")
-    df_Pedido_Final["CONV"] = ultimo_numerico.fillna(1).astype(float)
-
-    df_Pedido_Final["TOTAL"] = df_Pedido_Final["QtCx"] * df_Pedido_Final["CONV"]
+    # Obsoleto - usado na AlterData
+    # ultimo = df_Pedido_Final["Descricao"].astype(str).str.split().str[-1]
+    # ultimo_numerico = pd.to_numeric(ultimo, errors="coerce")
+    # df_Pedido_Final["CONV"] = ultimo_numerico.fillna(1).astype(float)
+    #  df_Pedido_Final["TOTAL"] = df_Pedido_Final["QtCx"] * df_Pedido_Final["CONV"]
+    df_Pedido_Final["TOTAL"] = df_Pedido_Final["QtCx"]
 
     df_Pedido_Final["VALOR_STR"] = df_Pedido_Final["TOTAL"].apply(
         lambda x: f"{x:09.3f}".replace(".", ",")
     )
 
-    return df_Pedido_Final, df_Erro_Desc, df_base
+    return df_Pedido_Final, df_Erro_Desc, df
 
 
 def salvar_pedido_banco_dados(loja, tipo, pedido_erp, pedido_original, obs=None):
@@ -225,8 +229,10 @@ def salvar_pedido_banco_dados(loja, tipo, pedido_erp, pedido_original, obs=None)
 
 
 def formata_pedido(df_sub, cod_cliente, doc_padrao):
-    prefixo = f"PV^{DDMMAA}^{doc_padrao}^{AAAAMMDD}{cod_cliente}^{SEGUNDOS}^"
-    sufixo = "^^0^400^000^^^V^^0.000^"
+
+    df_sub = df_sub[["CodProduto", "PrecoUnPd", "Obs", "VALOR_STR"]].fillna("^")
+    prefixo = f"PV^{DDMMAA}^{doc_padrao}^{AAAAMMDD}{cod_cliente}^{cod_cliente}^"
+    sufixo = "^^0^512^^^^V^"
 
     linhas_formatadas = []
     for _, row in df_sub.iterrows():
@@ -240,7 +246,7 @@ def formata_pedido(df_sub, cod_cliente, doc_padrao):
 
 AGORA = datetime.now()
 DDMMAA = AGORA.strftime("%d%m%y")
-AAAAMMDD = AGORA.strftime("%Y%m%dd")
+AAAAMMDD = AGORA.strftime("%Y%m%d")
 SEGUNDOS = str(AGORA.second)
 
 REGRAS_PRAZO = [
@@ -287,8 +293,10 @@ colunas_produto = [
 colunas_produto_extra = ["CodProduto", "Fam", "ListaCodCaract", "DescComplementar"]
 colunas_Pedidos = ["QtCx", "Sigla", "Descricao"]
 Linhas_Pedidos = 0
-link_produto = st.secrets["onedrive"]["links"]["produto"]
-link_produto_extra = st.secrets["onedrive"]["links"]["produto_extra"]
+link_produto = st.secrets["onedrive"]["links"]["produto_rp"]
+# Obsoleto - usado na AlterData
+# link_produto = st.secrets["onedrive"]["links"]["produto"]
+# link_produto_extra = st.secrets["onedrive"]["links"]["produto_extra"]
 desativa_manual = False
 produtos_cadastrados = 0
 LOJAS = [
@@ -362,20 +370,26 @@ with tab1:
 
         desativa_manual = True
 
-        if "dados_onedrive" not in st.session_state:
-            st.session_state.dados_onedrive = carregar_dados_onedrive(link_produto)
-        if "dados_onedrive_extra" not in st.session_state:
-            st.session_state.dados_onedrive_extra = carregar_dados_onedrive(
-                link_produto_extra
+        if "dados_onedrive_rp" not in st.session_state:
+            st.session_state.dados_onedrive_rp = carregar_dados_onedrive_rp(
+                link_produto
             )
 
-        response = st.session_state.dados_onedrive
-        response_extra = st.session_state.dados_onedrive_extra
+        # Obsoleto - usado na AlterData
+        # if "dados_onedrive_extra" not in st.session_state:
+        #     st.session_state.dados_onedrive_extra = carregar_dados_onedrive(
+        #         link_produto_extra
+        #     )
+
+        response = st.session_state.dados_onedrive_rp
+        # Obsoleto - usado na AlterData
+        # response_extra = st.session_state.dados_onedrive_extra
 
         if response["falha"]:
             st.error("Não foi possível pegar produto.txt automaticamente")
-        if response_extra["falha"]:
-            st.error("Não foi possível pegar produto_extra.txt automaticamente")
+        # Obsoleto - usado na AlterData
+        # if response_extra["falha"]:
+        #     st.error("Não foi possível pegar produto_extra.txt automaticamente")
 
         if response["data"]:
             ultima_modificacao_dt = converte_ultima_modificacao(response["data"])
@@ -384,8 +398,9 @@ with tab1:
                 f"Ultima modificação: :red[{ultima_modificacao_dt.strftime("%H:%M:%S")}]  | :red[{ultima_modificacao_dt.strftime("%d/%m/%Y")}]"
             )
 
-        f_produto_auto = response["resp"]
-        f_extra_auto = response_extra["resp"]
+        f_produto_auto = response["df"]
+        # Obsoleto - usado na AlterData
+        # f_extra_auto = response_extra["resp"]
 
     col1, col2 = st.columns(2)
     with col1:
@@ -430,17 +445,20 @@ if ((f_produto and f_extra) or desativa_manual) and f_pedido or f_pedido_atacado
     cod_cliente = df_loja[df_loja["Filial"] == loja_pedido]["cod_cliente_loja"].iloc[0]
 
     if desativa_manual:
-        df = abrir_arquivo_txt(f_produto_auto, colunas_produto)
-        df_extra = abrir_arquivo_txt(f_extra_auto, colunas_produto_extra)
-    else:
-        if f_produto.name != "00001produto.txt":
-            st.error(":material/Close: 00001produto.txt erro ao carregar")
-            st.stop()
-        if f_extra.name != "00001produtoextra.txt":
-            st.error(":material/Close: 00001produtoextra.txt erro ao carregar")
-            st.stop()
-        df = abrir_arquivo_txt(f_produto, colunas_produto)
-        df_extra = abrir_arquivo_txt(f_extra, colunas_produto_extra)
+        df = f_produto_auto
+        # Obsoleto - usado na AlterData
+        # df = abrir_arquivo_txt(f_produto_auto, colunas_produto)
+        # df_extra = abrir_arquivo_txt(f_extra_auto, colunas_produto_extra)
+    # Obsoleto - usado na AlterData
+    # else:
+    #     if f_produto.name != "00001produto.txt":
+    #         st.error(":material/Close: 00001produto.txt erro ao carregar")
+    #         st.stop()
+    #     if f_extra.name != "00001produtoextra.txt":
+    #         st.error(":material/Close: 00001produtoextra.txt erro ao carregar")
+    #         st.stop()
+    #     df = abrir_arquivo_txt(f_produto, colunas_produto)
+    #     df_extra = abrir_arquivo_txt(f_extra, colunas_produto_extra)
 
     # Importa Pedido da Loja
     if f_pedido:
@@ -474,7 +492,8 @@ if ((f_produto and f_extra) or desativa_manual) and f_pedido or f_pedido_atacado
             + df_pedido_atacado["Descricao"]
         )
         f_pedido_atacado = "\n".join(df_pedido_atacado["Qt Solicitada"])
-        f_pedido_atacado = io.StringIO(f_pedido_atacado)
+        # TODO-Necessário realizar processo para o atacado
+        # f_pedido_atacado = io.StringIO(f_pedido_atacado)
 
         df_Pedido_Loja, df_Erro_Qt, Linhas_Pedidos = trata_pedido_loja(
             abrir_arquivo_txt(f_pedido_atacado), colunas_Pedidos
@@ -482,8 +501,12 @@ if ((f_produto and f_extra) or desativa_manual) and f_pedido or f_pedido_atacado
     produtos_cadastrados = len(df)
 
     df_Pedido_Final, df_Erro_Desc, df_Produto_Base = processar_pedidos(
-        df, df_extra, df_Pedido_Loja
+        df, False, df_Pedido_Loja
     )
+    # Obsoleto - usado na AlterData
+    # df_Pedido_Final, df_Erro_Desc, df_Produto_Base = processar_pedidos(
+    #     df, df_extra, df_Pedido_Loja
+    # )
 
     st.write(f"Foram importados: {Linhas_Pedidos} linhas")
 
@@ -542,7 +565,7 @@ if ((f_produto and f_extra) or desativa_manual) and f_pedido or f_pedido_atacado
                     ].replace(mapeamento)
 
                     df_Pedido_Final, df_Erro_Desc, _ = processar_pedidos(
-                        df, df_extra, df_Pedido_Corrigido
+                        df, False, df_Pedido_Corrigido
                     )
     else:
         st.success("Sem erro de exportação")
@@ -550,7 +573,7 @@ if ((f_produto and f_extra) or desativa_manual) and f_pedido or f_pedido_atacado
         aplicar_correcao = False
 
     # --- DOWNLOADS ---
-    Linhas_Pedidos_por_Tipo = df_Pedido_Final["TIPO"].value_counts().to_dict()
+    Linhas_Pedidos_por_Tipo = df_Pedido_Final["CLASSE"].value_counts().to_dict()
 
     if not Linhas_Pedidos_por_Tipo:
         st.error("ERRO NA IMPORTAÇÃO - Arquivo fora do padrão")
@@ -564,12 +587,14 @@ if ((f_produto and f_extra) or desativa_manual) and f_pedido or f_pedido_atacado
         else:
             st.header(f":blue[{loja_pedido}] - Baixar Pedidos Gerados")
 
+        if not cod_cliente:
+            st.error("Não foi encontrado código do cliente")
+
         c1, c2, c3 = st.columns(3)
         tipos = [("SECO", c1), ("CONG", c2), ("PESO", c3)]
+
         for tipo, col in tipos:
-            df_sub = df_Pedido_Final[df_Pedido_Final["TIPO"] == tipo][
-                ["Codigo", "VALOR_STR"]
-            ]
+            df_sub = df_Pedido_Final[df_Pedido_Final["CLASSE"] == tipo]
             with col:
                 if not df_sub.empty:
 
@@ -622,5 +647,5 @@ with st.sidebar:
         st.subheader("Link para produto.txt:")
         st.link_button("Clique aqui", link_produto)
 
-        st.subheader("Link para produtoextra.txt:")
-        st.link_button("Clique aqui", link_produto_extra)
+        # st.subheader("Link para produtoextra.txt:")
+        # st.link_button("Clique aqui", link_produto_extra)

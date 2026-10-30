@@ -24,7 +24,9 @@ lanca_pedido_page = st.Page(
     "pages/1Lanca_Pedido.py", title="Lança Pedidos", icon=":material/add_shopping_cart:"
 )
 lanca_rp_page = st.Page(
-    "pages/Pedido_RP.py", title="Lança Pedidos RP", icon=":material/add_shopping_cart:"
+    "pages/RP_Pedido.py",
+    title="Lança Pedidos RP",
+    icon=":material/add_shopping_cart:",
 )
 divisao_page = st.Page(
     "pages/divisao.py", title="Divisão", icon=":material/prompt_suggestion:"
@@ -57,6 +59,8 @@ lista_loja_page = st.Page(
 lista_atacado_page = st.Page(
     "pages/3Atacado.py", title="Lista Atacado", icon=":material/local_mall:"
 )
+
+rp_lista_page = st.Page("pages/RP_Lista.py", title="RP Lista", icon=":material/list:")
 
 # financeiro
 previa_financeira_page = st.Page(
@@ -110,6 +114,7 @@ pages = {
 if st.session_state.perfil.get("role") == "administrador":
     pages["Relatórios"] = [Faturamento, CMV, Evolucao_Vendas, resultados]
     pages["Administrativo"].append(lanca_rp_page)
+    pages["Lista"].append(rp_lista_page)
 
 # --- CONFIGURAÇÃO PAGINA ---
 pg = st.navigation(pages, position="top")
