@@ -23,13 +23,15 @@ if st.session_state.get("debugger"):
 with st.sidebar:
     st.markdown("## Configurações do Sistema")
     # A FLAG PRINCIPAL:
-    sistema = st.radio("Selecione o ERP de Destino:", ["AlterData", "RPOne"])
+    sistema = st.pills(
+        "Selecione o ERP de Destino:", ["AlterData", "RPOne"], default="RPOne"
+    )
 
     if sistema == "RPOne":
         doc_padrao = st.text_input("Documento Padrão", value="6101")
         link_produto = st.secrets["onedrive"]["links"]["produto_rp"]
         link_produto_extra = None
-    else:
+    if sistema == "AlterData":
         link_produto = st.secrets["onedrive"]["links"]["produto"]
         link_produto_extra = st.secrets["onedrive"]["links"]["produto_extra"]
 
@@ -321,6 +323,10 @@ def formata_pedido_rp(df_sub, cod_cliente, doc_pad):
 
 # --- INTERFACE STREAMLIT PRINCIPAL ---
 st.title(":material/Folder_Check_2: Conversor de Pedidos para Importação")
+
+if not sistema:
+    st.error("Selecione o ERP Destino (barra lateral)")
+
 confere_prazo_pedido()
 st.space()
 
@@ -374,7 +380,7 @@ with tab1:
             f_produto_auto = response["resp"]
             f_extra_auto = response_extra["resp"]
 
-        else:  # RPOne
+        if sistema == "RPOne":
             if "dados_onedrive_rp" not in st.session_state:
                 st.session_state.dados_onedrive_rp = carregar_dados_onedrive_rp(
                     link_produto
@@ -405,7 +411,7 @@ with tab1:
                 disabled=desativa_manual,
                 type="txt",
             )
-        else:
+        if sistema == "RPOne":
             f_extra = None
 
 with tab2:
@@ -442,14 +448,14 @@ if liberado:
         if sistema == "AlterData":
             df = abrir_arquivo_txt(f_produto_auto, colunas_produto)
             df_extra = abrir_arquivo_txt(f_extra_auto, colunas_produto_extra)
-        else:
+        if sistema == "RPOne":
             df = f_produto_auto
             df_extra = None
     else:
         if sistema == "AlterData":
             df = abrir_arquivo_txt(f_produto, colunas_produto)
             df_extra = abrir_arquivo_txt(f_extra, colunas_produto_extra)
-        else:
+        if sistema == "RPOne":
             df = pd.read_csv(
                 f_produto, sep=None, engine="python"
             )  # Caso upado manualmente
@@ -576,7 +582,7 @@ if liberado:
                             output, sep="\t", index=False, header=False
                         )
                         conteudo_arquivo = output.getvalue()
-                    else:  # RPOne
+                    if sistema == "RPOne":
                         cod_cliente = (
                             df_lojas.loc[
                                 df_lojas["Filial"] == loja_pedido, "cod_cliente_loja"
@@ -605,6 +611,8 @@ if liberado:
                     st.info(f"Sem itens para {tipo}")
 
 with st.sidebar:
+    st.space()
+    st.markdown("### Produtos Base")
     st.write(f"Produtos cadastrados na memória: :blue[{produtos_cadastrados}]")
     if link_produto:
         st.link_button("Acessar Arquivo Principal", link_produto)
