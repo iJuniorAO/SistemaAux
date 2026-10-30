@@ -41,7 +41,7 @@ with st.sidebar:
 # --- CONSTANTES ---
 AGORA = datetime.now()
 DDMMAA = AGORA.strftime("%d%m%y")
-AAAAMMDD = AGORA.strftime("%Y%m%d")
+AAAAMMDD = AGORA.strftime("%Y%m%d%H%M")[:11]
 SEGUNDOS = str(AGORA.second)
 # variavel de implantação será usada para caso seja utilizado o txt da AlterData e seja importado para o sistema da RP faça o devido tratamento
 
@@ -244,7 +244,7 @@ def processar_pedidos(df, df_extra, df_Pedido_Loja, sis_flag):
         ]
         df["TIPO"] = np.select(CONDICOES, ["PESO", "CONG"], default="SECO")
 
-    else:  # RPOne
+    if sis_flag == "RPOne":
         if df_extra is not None and not df_extra.empty:
             df = df.merge(
                 df_extra[["CodProduto", "ListaCodCaract"]], on="CodProduto", how="left"
@@ -287,12 +287,17 @@ def processar_pedidos(df, df_extra, df_Pedido_Loja, sis_flag):
         ultimo_numerico = pd.to_numeric(ultimo, errors="coerce")
         df_Pedido_Final["CONV"] = ultimo_numerico.fillna(1).astype(float)
         df_Pedido_Final["TOTAL"] = df_Pedido_Final["QtCx"] * df_Pedido_Final["CONV"]
-    else:
+        df_Pedido_Final["VALOR_STR"] = df_Pedido_Final["TOTAL"].apply(
+            lambda x: f"{x:09.3f}".replace(".", ",")
+        )
+    if sis_flag == "RPOne":
+        df_Pedido_Final["PrecoUnPd"] = (
+            df_Pedido_Final["PrecoUnPd"] * df_Pedido_Final["QtCx"]
+        )
         df_Pedido_Final["TOTAL"] = df_Pedido_Final["QtCx"]
-
-    df_Pedido_Final["VALOR_STR"] = df_Pedido_Final["TOTAL"].apply(
-        lambda x: f"{x:09.3f}".replace(".", ",")
-    )
+        df_Pedido_Final["VALOR_STR"] = df_Pedido_Final["TOTAL"].apply(
+            lambda x: f"{x:03.3f}"
+        )
 
     return df_Pedido_Final, df_Erro_Desc, df
 
@@ -322,9 +327,13 @@ def salvar_pedido_banco_dados(loja, tipo, pedido_gerado, pedido_original, obs=No
 
 
 def formata_pedido_rp(df_sub, cod_cliente, doc_pad):
-    df_sub = df_sub[["CodProduto", "PrecoUnPd", "Obs", "VALOR_STR"]].fillna("^")
+
+    df_sub = df_sub[["CodProduto", "VALOR_STR", "Obs", "PrecoUnPd"]].copy()
+    df_sub["CodProduto"] = df_sub["CodProduto"].astype(np.int64).astype(str)
+    df_sub = df_sub.fillna("")
+
     prefixo = f"PV^{DDMMAA}^{doc_pad}^{AAAAMMDD}{cod_cliente}^{cod_cliente}^"
-    sufixo = "^^0^512^^^^V^"
+    sufixo = "^^0^512^006^^^V^^0.000^"
 
     linhas_formatadas = [
         f"{prefixo}{'^'.join(row.astype(str))}{sufixo}" for _, row in df_sub.iterrows()
@@ -592,6 +601,7 @@ if liberado:
                         df_sub[["Codigo", "VALOR_STR"]].to_csv(
                             output, sep="\t", index=False, header=False
                         )
+                        formato_arquivo = ".txt"
                         conteudo_arquivo = output.getvalue()
                     if sistema == "RPOne":
                         cod_cliente = (
@@ -604,11 +614,12 @@ if liberado:
                         conteudo_arquivo = formata_pedido_rp(
                             df_sub, cod_cliente, doc_padrao
                         )
+                        formato_arquivo = ".apv"
 
                     st.download_button(
                         label=f":material/Download: Baixar Pedido {tipo}",
                         data=conteudo_arquivo,
-                        file_name=f"{AGORA.strftime('%Y%m%d_%HH%MM')}_{loja_pedido}_{tipo}.txt",
+                        file_name=f"{AGORA.strftime('%Y%m%d_%HH%MM')}_{loja_pedido}_{tipo}{formato_arquivo}",
                         mime="text/plain",
                         on_click="ignore",
                     )
