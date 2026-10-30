@@ -1,9 +1,10 @@
+from PIL import ExifTags
 import streamlit as st
 import pandas as pd
 import re
 import io
 import requests
-from utils import carregar_dados_onedrive, converte_ultima_modificacao
+from utils import carregar_dados_onedrive_rp, converte_ultima_modificacao
 
 
 # --- FUNÇÕES E DEFINIÇÕES
@@ -21,7 +22,7 @@ def abrir_arquivo_txt(arquivo, colunas=None):
 
 COLUNAS_PRODUTOS = [
     "CodProduto",
-    "CodGrupo",
+    "TIPO",
     "Descricao",
     "SiglaUn",
     "MinVenda",
@@ -38,41 +39,8 @@ COLUNAS_PRODUTOS = [
 ]
 COLUNAS_PRODUTOS_EXTRA = ["CodProduto", "Fam", "ListaCodCaract", "DescComplementar"]
 GRUPO = ["SECO", "CONG", "REFR", "PESO"]
-# FORNECEDORES = marcas = [
-#     "ATALAIA",
-#     "AYMORE",
-#     "BELINHO",
-#     "CIDINHA",
-#     "DONDON",
-#     "ELMA CHIPS",
-#     "FINI",
-#     "FRUTTBOM",
-#     "FUGINI",
-#     "HELLMANNS",
-#     "ITAMBE",
-#     "KIBON",
-#     "LOBITS",
-#     "MAMMA DALVA",
-#     "MAMMAMIA",
-#     "MARICOTA",
-#     "MAVI",
-#     "MINAS MAIS",
-#     "NESTLE",
-#     "NINHO",
-#     "PALHA LEVE",
-#     "PERDIGAO",
-#     "PORTO ALEGRE",
-#     "PULSI",
-#     "RENATA",
-#     "SADIA",
-#     "SEARA",
-#     "TREVO",
-#     "UAI",
-#     "UNIBABY",
-#     "YPE",
-# ]
-link_produto = st.secrets["onedrive"]["links"]["produto"]
-link_produto_extra = st.secrets["onedrive"]["links"]["produto_extra"]
+
+link_produto = st.secrets["onedrive"]["links"]["produto_rp"]
 desativa_manual = False
 produtos_cadastrados = 0
 
@@ -86,20 +54,13 @@ bd_automatico = st.toggle("Deseja pegar arquivos automaticamente?", value=True)
 if bd_automatico:
     desativa_manual = True
 
-    if "dados_onedrive" not in st.session_state:
-        st.session_state.dados_onedrive = carregar_dados_onedrive(link_produto)
-    if "dados_onedrive_extra" not in st.session_state:
-        st.session_state.dados_onedrive_extra = carregar_dados_onedrive(
-            link_produto_extra
-        )
+    if "dados_onedrive_rp" not in st.session_state:
+        st.session_state.dados_onedrive_rp = carregar_dados_onedrive_rp(link_produto)
 
-    response = st.session_state.dados_onedrive
-    response_extra = st.session_state.dados_onedrive_extra
+    response = st.session_state.dados_onedrive_rp
 
     if response["falha"]:
         st.error("Não foi possível pegar produto.txt automaticamente")
-    if response_extra["falha"]:
-        st.error("Não foi possível pegar produto_extra.txt automaticamente")
 
     if response["data"]:
         ultima_modificacao_dt = converte_ultima_modificacao(response["data"])
@@ -108,8 +69,9 @@ if bd_automatico:
             f"Ultima modificação: :red[{ultima_modificacao_dt.strftime("%H:%M:%S")}]  | :red[{ultima_modificacao_dt.strftime("%d/%m/%Y")}]"
         )
 
-    f_produto_auto = response["resp"]
-    f_extra_auto = response_extra["resp"]
+    f_produto_auto = response["df"]
+    GRUPO = f_produto_auto["TIPO"].unique().tolist()
+    GRUPO.append("PESO")
 
 
 col1, col2 = st.columns(2)
@@ -150,13 +112,13 @@ with c2:
 
 # --- PROCESSAMENTO
 
-if (f_produto and f_extra) or desativa_manual:
+if f_produto or desativa_manual:
     with st.status("Processando dados...", expanded=True) as status:
         #   1. Inicialização
         # Abre df
         if desativa_manual:
-            df = abrir_arquivo_txt(f_produto_auto, COLUNAS_PRODUTOS)
-            df_extra = abrir_arquivo_txt(f_extra_auto, COLUNAS_PRODUTOS_EXTRA)
+            df = f_produto_auto
+            df_extra = False
         else:
             if f_produto.name != "00001produto.txt":
                 st.error(":material/Close: 00001produto.txt erro ao carregar")
@@ -169,34 +131,22 @@ if (f_produto and f_extra) or desativa_manual:
 
         produtos_cadastrados = len(df)
         # Merge Produto + Extra
-        df = df.merge(
-            df_extra[["CodProduto", "ListaCodCaract"]], on="CodProduto", how="left"
-        )
+        if df_extra:
+            df = df.merge(
+                df_extra[["CodProduto", "ListaCodCaract"]], on="CodProduto", how="left"
+            )
 
-        df = df[
-            ["CodProduto", "CodGrupo", "Descricao", "Estoq", "Fam", "ListaCodCaract"]
-        ]
+        df = df[["CodProduto", "TIPO", "Descricao", "Estoq", "Fam", "ListaCodCaract"]]
 
         # Cria coluna de fornecedores
         df["Fornecedor"] = df["Descricao"].str.split().str[-3]
-
-        # Cria nova coluna de tipo
-        if False:
-            df["TIPO"] = "SECO"
-            df.loc[df["CodGrupo"].isin([9, 14]), "TIPO"] = "CONG"
-            df.loc[df["ListaCodCaract"].astype(str).str.contains("000002"), "TIPO"] = (
-                "PESO"
-            )
 
         df["FAMILIA"] = "-"
         df.loc[df["Fam"] == 900000007, "FAMILIA"] = "LISTA"
         df.loc[df["Fam"] == 900000008, "FAMILIA"] = "DIVISAO"
         df.loc[df["Fam"] == 900000009, "FAMILIA"] = "LOJA"
 
-        df["TIPO"] = "SECO"
-        df.loc[df["CodGrupo"].isin([9]), "TIPO"] = "CONG"
-        df.loc[df["CodGrupo"].isin([14]), "TIPO"] = "REFR"
-        df.loc[df["ListaCodCaract"].astype(str).str.contains("000002"), "TIPO"] = "PESO"
+        df.loc[df["ListaCodCaract"].astype(str).str.contains("KG"), "TIPO"] = "PESO"
 
         #   2. FILTRO DATAFRAME
         # filtro negativo
@@ -248,41 +198,22 @@ if (f_produto and f_extra) or desativa_manual:
 
         status.update(label="Processamento concluído!", state="complete")
 
-    coluna1, coluna2, coluna3, coluna4 = st.columns(4)
-    tipos = [("SECO", coluna1), ("CONG", coluna2), ("REFR", coluna3), ("PESO", coluna4)]
+    colunas = st.columns(max(len(GRUPO), 1))
+    tipos = list(zip(GRUPO, colunas))
 
     for tipo, col in tipos:
-        # Filtrar o DF pelo tipo
         df_filtrado = df_removido[df_removido["TIPO"] == tipo]
 
-        # Só exibe se houver dados para aquele tipo
         with col:
             if not df_filtrado.empty:
                 with st.expander(
                     f":material/Copy_All: {len(df_filtrado)} itens: {tipo}",
                     expanded=True,
                 ):
+                    # Adiciona o próprio tipo diretamente no topo da lista
+                    dfList = [tipo] + df_filtrado["Descricao"].astype(str).tolist()
+                    texto_formatado = "\n".join(dfList)
 
-                    # Criar a string formatada (um item por linha)
-                    if tipo == "CONG":
-                        dfList = df_filtrado["Descricao"].astype(str).tolist()
-                        dfList.insert(0, "CONGELADO")
-                        texto_formatado = "\n".join(dfList)
-                    elif tipo == "REFR":
-                        dfList = df_filtrado["Descricao"].astype(str).tolist()
-                        dfList.insert(0, "REFRIGERADO")
-                        texto_formatado = "\n".join(dfList)
-                    elif tipo == "SECO":
-                        dfList = df_filtrado["Descricao"].astype(str).tolist()
-                        dfList.insert(0, "SECO")
-                        texto_formatado = "\n".join(dfList)
-                    else:
-                        dfList = df_filtrado["Descricao"].astype(str).tolist()
-                        dfList.insert(0, "PESÁVEIS")
-                        texto_formatado = "\n".join(dfList)
-
-                    # texto_formatado = "\n".join(df_filtrado["Descricao"].astype(str).tolist())
-                    # O usuário clica no ícone que aparece no canto superior direito do quadro
                     st.code(texto_formatado, language=None)
                     st.caption(
                         f"Clique no ícone no canto superior direito do quadro acima para copiar os itens de {tipo}."
@@ -301,6 +232,4 @@ with st.sidebar:
         st.subheader("Link para produto.txt:")
         st.link_button("Clique aqui", link_produto)
 
-        st.subheader("Link para produtoextra.txt:")
-        st.link_button("Clique aqui", link_produto_extra)
     st.write(f"Produtos cadastrados: :blue[{produtos_cadastrados}]")
