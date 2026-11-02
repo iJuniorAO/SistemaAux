@@ -43,6 +43,10 @@ pedidos_page = st.Page(
     "pages/4Pedidos.py", title="Pedidos Feitos", icon=":material/shopping_cart:"
 )
 
+pedidos_geral_page = st.Page(
+    "pages/PedidosGeral.py", title="Pedidos Geral", icon=":material/add_shopping_cart:"
+)
+
 trocas_page = st.Page(
     "pages/jira.py",
     title="Trocas e Devolucoes",
@@ -58,6 +62,9 @@ lista_loja_page = st.Page(
 )
 lista_atacado_page = st.Page(
     "pages/3Atacado.py", title="Lista Atacado", icon=":material/local_mall:"
+)
+lista_geral_page = st.Page(
+    "pages/ListaGeral.py", title="Lista Geral", icon=":material/shelves:"
 )
 
 rp_lista_page = st.Page("pages/RP_Lista.py", title="RP Lista", icon=":material/list:")
@@ -96,6 +103,7 @@ rotas_page = st.Page("pages/Rotas.py", title="Rotas", icon=":material/route:")
 pages = {
     "Home": [login_page, home_page, margem_page],
     "Administrativo": [
+        pedidos_geral_page,
         fazer_pedido_page,
         lanca_pedido_page,
         divisao_page,
@@ -106,7 +114,7 @@ pages = {
         validade,
     ],
     "Logistica": [rotas_page, print_guia_page],
-    "Lista": [lista_loja_page, lista_atacado_page],
+    "Lista": [lista_geral_page, lista_loja_page, lista_atacado_page],
     "Financeiro": [previa_financeira_page],
 }
 
