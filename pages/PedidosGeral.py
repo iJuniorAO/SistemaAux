@@ -278,11 +278,7 @@ def processar_pedidos(df, df_extra, df_Pedido_Loja, sis_flag):
                 if "ListaCodCaract" in df.columns
                 else False
             ),
-            (
-                df["TIPO"].isin(["REFRIGERADO", "CONGELADO"])
-                if "TIPO" in df.columns
-                else False
-            ),
+            (df["CodGrupo"].isin(["REFRIGERADO", "CONGELADO"])),
         ]
         df["TIPO"] = np.select(
             CONDICOES, ["PESO", "CONG"], default="SECO"
