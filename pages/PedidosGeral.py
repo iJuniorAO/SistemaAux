@@ -309,8 +309,15 @@ def processar_pedidos(df, df_extra, df_Pedido_Loja, sis_flag):
             lambda x: f"{x:09.3f}".replace(".", ",")
         )
     if sis_flag == "RPOne":
+        # df_Pedido_Final["CONV"] = ultimo_numerico.fillna(1).astype(float)
+        df_Pedido_Final["CONV"] = df_Pedido_Final["SiglaUn"]
         df_Pedido_Final["PrecoUnPd"] = (
-            df_Pedido_Final["PrecoUnPd"] * df_Pedido_Final["QtCx"]
+            df_Pedido_Final["PrecoUnPd"]
+            * df_Pedido_Final["QtCx"]
+            * df_Pedido_Final["CONV"]
+        )
+        df_Pedido_Final["PrecoUnPd"] = df_Pedido_Final["PrecoUnPd"].apply(
+            lambda x: f"{x:03.3f}"
         )
         df_Pedido_Final["TOTAL"] = df_Pedido_Final["QtCx"]
         df_Pedido_Final["VALOR_STR"] = df_Pedido_Final["TOTAL"].apply(
