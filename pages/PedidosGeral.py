@@ -353,7 +353,7 @@ def salvar_pedido_banco_dados(loja, tipo, pedido_gerado, pedido_original, obs=No
 
 def formata_pedido_rp(df_sub, cod_cliente, doc_pad):
 
-    df_sub = df_sub[["CodProduto", "VALOR_STR", "Obs", "PrecoUnPd"]].copy()
+    df_sub = df_sub[["CodProduto", "VALOR_STR", "CONV", "PrecoUnPd"]].copy()
     df_sub["CodProduto"] = df_sub["CodProduto"].astype(np.int64).astype(str)
     df_sub = df_sub.fillna("")
 
