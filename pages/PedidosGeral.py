@@ -29,7 +29,7 @@ with st.sidebar:
 
     if sistema == "RPOne":
         doc_padrao = st.text_input("Documento Padrão", value="6101")
-        link_produto = st.secrets["onedrive"]["links"]["produto_rp"]
+        link_produto = st.secrets["onedrive"]["links"]["produto_rp_txt"]
         link_produto_extra = None
     if sistema == "AlterData":
         link_produto = st.secrets["onedrive"]["links"]["produto"]
@@ -87,6 +87,24 @@ colunas_produto = [
     "DescMax",
     "Fam",
 ]
+colunas_produto_rp = [
+    "CodProduto",
+    "CodGrupo",
+    "Descricao",
+    "SiglaUn",
+    "MinVenda",
+    "PrecoUnPd",
+    "CodPrincProd",
+    "Estoq",
+    "Obs",
+    "Grade",
+    "Falta",
+    "Novo",
+    "Prom",
+    "DescMax",
+    "Fam",
+    "ListaCodCaract",
+]
 colunas_produto_extra = ["CodProduto", "Fam", "ListaCodCaract", "DescComplementar"]
 colunas_Pedidos = ["QtCx", "Sigla", "Descricao"]
 
@@ -98,12 +116,17 @@ supabase: Client = create_client(url, key)
 
 
 # --- FUNÇÕES ---
-def abrir_arquivo_txt(arquivo, colunas=None):
+def abrir_arquivo_txt(arquivo, colunas=None, separador="|", eng=None):
     try:
         if isinstance(arquivo, str):
             arquivo = io.StringIO(arquivo)
         return pd.read_csv(
-            arquivo, sep="|", header=None, names=colunas, encoding="latin1"
+            arquivo,
+            sep=separador,
+            header=None,
+            names=colunas,
+            encoding="latin1",
+            engine=eng,
         )
     except Exception as e:
         st.error(f"Erro ao ler arquivo {e}")
@@ -149,8 +172,7 @@ def limpa_texto(uploaded_file):
 
         if IMPLANTACAO:
             if sistema == "RPOne":
-                if linha == linha.upper():
-                    linha = linha.title()
+                linha = linha.title()
 
         colunas = linha.split()
         if len(colunas) >= 1 and not colunas[0].isdigit():
@@ -402,7 +424,7 @@ with tab1:
 
         if sistema == "RPOne":
             if "dados_onedrive_rp" not in st.session_state:
-                st.session_state.dados_onedrive_rp = carregar_dados_onedrive_rp(
+                st.session_state.dados_onedrive_rp = carregar_dados_onedrive(
                     link_produto
                 )
 
@@ -416,7 +438,7 @@ with tab1:
                     f"Ultima modificação base: :red[{ultima_modificacao_dt.strftime('%H:%M:%S')}]  | :red[{ultima_modificacao_dt.strftime('%d/%m/%Y')}]"
                 )
 
-            f_produto_auto = response["df"]
+            f_produto_auto = response["resp"]
 
     col1, col2 = st.columns(2)
     with col1:
@@ -469,7 +491,7 @@ if liberado:
             df = abrir_arquivo_txt(f_produto_auto, colunas_produto)
             df_extra = abrir_arquivo_txt(f_extra_auto, colunas_produto_extra)
         if sistema == "RPOne":
-            df = f_produto_auto
+            df = abrir_arquivo_txt(f_produto_auto, colunas_produto_rp, ";", "python")
             df_extra = None
     else:
         if sistema == "AlterData":
