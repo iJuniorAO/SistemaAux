@@ -11,12 +11,17 @@ from utils import (
 
 
 # --- FUNÇÕES E DEFINIÇÕES ---
-def abrir_arquivo_txt(arquivo, colunas=None):
+def abrir_arquivo_txt(arquivo, colunas=None, separador="|", eng=None):
     try:
         if isinstance(arquivo, str):
             arquivo = io.StringIO(arquivo)
         return pd.read_csv(
-            arquivo, sep="|", header=None, names=colunas, encoding="latin1"
+            arquivo,
+            sep=separador,
+            header=None,
+            names=colunas,
+            encoding="latin1",
+            engine=eng,
         )
     except Exception as e:
         st.error(f"Erro ao ler arquivo {e}")
@@ -42,7 +47,7 @@ COLUNAS_PRODUTOS_ALTERDATA = [
 ]
 COLUNAS_PRODUTOS_RP = [
     "CodProduto",
-    "TIPO",
+    "CodGrupo",
     "Descricao",
     "SiglaUn",
     "MinVenda",
@@ -56,6 +61,7 @@ COLUNAS_PRODUTOS_RP = [
     "Prom",
     "DescMax",
     "Fam",
+    "ListaCodCaract",
 ]
 COLUNAS_PRODUTOS_EXTRA = ["CodProduto", "Fam", "ListaCodCaract", "DescComplementar"]
 COLUNAS_PRODUTOS_PRECO = ["Tabela", "CodProduto", "Preco"]
@@ -100,8 +106,9 @@ st.set_page_config(page_title="Gestor de Listas e Atacado", layout="wide")
 # --- SIDEBAR DE CONTROLE ---
 with st.sidebar:
     st.markdown("## ⚙️ Configuração do Sistema")
-    sistema = st.radio("Selecione o ERP:", ["AlterData", "RPOne"])
-
+    sistema = st.pills(
+        "Selecione o ERP de Destino:", ["AlterData", "RPOne"], default="RPOne"
+    )
     if sistema == "AlterData":
         modo = st.radio("Modo de Operação:", ["Lista Comum", "Atacado"])
         link_produto = st.secrets["onedrive"]["links"]["produto"]
@@ -116,7 +123,7 @@ with st.sidebar:
         modo = "Lista Comum"
         habilita_preco_cx = False
         st.info("Modo Atacado não habilitado para RPOne")
-        link_produto = st.secrets["onedrive"]["links"]["produto_rp"]
+        link_produto = st.secrets["onedrive"]["links"]["produto_rp_txt"]
         link_produto_extra = None
         link_tabela_preco = None
 
@@ -170,19 +177,28 @@ if bd_automatico:
 
     if sistema == "RPOne":
         if "dados_onedrive_rp" not in st.session_state:
-            st.session_state.dados_onedrive_rp = carregar_dados_onedrive_rp(
-                link_produto
-            )
+            st.session_state.dados_onedrive_rp = carregar_dados_onedrive(link_produto)
 
         resp = st.session_state.dados_onedrive_rp
         if resp["falha"]:
             st.error("Erro ao pegar csv de produtos RPOne")
-        f_produto_auto = resp["df"]
+        f_produto_auto = resp["resp"]
+
+        f_produto_auto = abrir_arquivo_txt(
+            f_produto_auto, COLUNAS_PRODUTOS_RP, ";", "python"
+        )
+
+        f_produto_auto["TIPO"] = f_produto_auto["CodGrupo"]
 
         if not resp["falha"]:
+            # GRUPO = f_produto_auto["CodGrupo"].unique().tolist()
             GRUPO = f_produto_auto["TIPO"].unique().tolist()
             if "PESO" not in GRUPO:
                 GRUPO.append("PESO")
+
+            GRUPO = ["Sem Grupo" if pd.isna(x) else x for x in GRUPO]
+            if "Sem Grupo" in GRUPO:
+                f_produto_auto["TIPO"] = f_produto_auto["TIPO"].fillna("Sem Grupo")
 
         data_mod = resp["data"]
 
