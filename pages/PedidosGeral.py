@@ -246,9 +246,7 @@ def confere_prazo_pedido():
 
 # FUNÇÃO UNIFICADA DE PROCESSAMENTO
 def processar_pedidos(df, df_extra, df_Pedido_Loja, sis_flag):
-    # df = df[(df["Fam"] != 900000008) & (df["Estoq"] > 0)].copy()
-    # DEBBUG - retirado filtro para testes em produção utilizar o filtro acima
-    df = df[(df["Fam"] != 900000008)].copy()
+    df = df[(df["Fam"] != 900000008) & (df["Estoq"] > 0)].copy()
 
     if sis_flag == "AlterData":
         df = df[["CodProduto", "CodGrupo", "Descricao", "Estoq", "Fam"]]
