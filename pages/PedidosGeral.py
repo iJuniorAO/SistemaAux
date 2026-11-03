@@ -490,6 +490,10 @@ st.space()
 
 # --- GATILHO DE EXECUÇÃO ---
 liberado = (f_produto is not None or desativa_manual) and (f_pedido or f_pedido_atacado)
+tem_loja = bool(loja_pedido)
+tem_atacado = bool(atacado_pedido.strip())
+
+
 if liberado:
     if f_pedido and f_pedido_atacado:
         st.error(
@@ -497,8 +501,15 @@ if liberado:
         )
         st.stop()
 
-    if loja_pedido and atacado_pedido:
-        st.error(":material/Priority_High: Selecione ou loja ou atacado")
+    if tem_loja and tem_atacado:
+        st.error(
+            ":material/priority_high: Preencha apenas Loja ou Atacado (não ambos)."
+        )
+        st.stop()
+    elif not tem_loja and not tem_atacado:
+        st.error(
+            ":material/priority_high: Informe ao menos uma opção: Loja ou Atacado."
+        )
         st.stop()
 
     # Prepara base
