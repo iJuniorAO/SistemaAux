@@ -41,7 +41,7 @@ with st.sidebar:
 # --- CONSTANTES ---
 AGORA = datetime.now()
 DDMMAA = AGORA.strftime("%d%m%y")
-AAAAMMDD = AGORA.strftime("%Y%m%d%H%M")[:11]
+AAAAMMDD = AGORA.strftime("%y%m%d%H%M")[:11]
 SEGUNDOS = str(AGORA.second)
 # variavel de implantação será usada para caso seja utilizado o txt da AlterData e seja importado para o sistema da RP faça o devido tratamento
 
@@ -351,13 +351,15 @@ def salvar_pedido_banco_dados(loja, tipo, pedido_gerado, pedido_original, obs=No
         return st.info("Pedidos Atacado não são Salvos no Banco de Dados")
 
 
-def formata_pedido_rp(df_sub, cod_cliente, doc_pad):
+def formata_pedido_rp(df_sub, cod_cliente, doc_pad, tipo):
+
+    cod_tipo = {"SECO": "1", "CONG": "2", "PESO": "3"}
 
     df_sub = df_sub[["CodProduto", "VALOR_STR", "CONV", "PrecoUnPd"]].copy()
     df_sub["CodProduto"] = df_sub["CodProduto"].astype(np.int64).astype(str)
     df_sub = df_sub.fillna("")
 
-    prefixo = f"PV^{DDMMAA}^{doc_pad}^{AAAAMMDD}{cod_cliente}^{cod_cliente}^"
+    prefixo = f"PV^{DDMMAA}^{doc_pad}^{AAAAMMDD}{cod_tipo.get(tipo,0)}{cod_cliente}^{cod_cliente}^"
     sufixo = "^^0^512^006^^^V^^0.000^"
 
     linhas_formatadas = [
@@ -637,7 +639,7 @@ if liberado:
                             else ""
                         )
                         conteudo_arquivo = formata_pedido_rp(
-                            df_sub, cod_cliente, doc_padrao
+                            df_sub, cod_cliente, doc_padrao, tipo
                         )
                         formato_arquivo = ".apv"
 
