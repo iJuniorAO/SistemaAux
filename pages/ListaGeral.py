@@ -109,20 +109,17 @@ with st.sidebar:
     sistema = st.pills(
         "Selecione o ERP de Destino:", ["AlterData", "RPOne"], default="RPOne"
     )
+    modo = st.radio("Modo de Operação:", ["Lista Comum", "Atacado"])
+    if modo == "Atacado":
+        habilita_preco_cx = st.toggle("Habilitar Preço por Caixa", value=False)
+    else:
+        habilita_preco_cx = False
     if sistema == "AlterData":
-        modo = st.radio("Modo de Operação:", ["Lista Comum", "Atacado"])
         link_produto = st.secrets["onedrive"]["links"]["produto"]
         link_produto_extra = st.secrets["onedrive"]["links"]["produto_extra"]
         link_tabela_preco = st.secrets["onedrive"]["links"]["tabela_preco"]
 
-        if modo == "Atacado":
-            habilita_preco_cx = st.toggle("Habilitar Preço por Caixa", value=False)
-        else:
-            habilita_preco_cx = False
     if sistema == "RPOne":
-        modo = "Lista Comum"
-        habilita_preco_cx = False
-        st.info("Modo Atacado não habilitado para RPOne")
         link_produto = st.secrets["onedrive"]["links"]["produto_rp_txt"]
         link_produto_extra = None
         link_tabela_preco = None
@@ -237,6 +234,8 @@ with c1:
     ind_div = st.checkbox("[:material/Safety_Divider:]  Divisão", value=True)
     if modo == "Lista Comum":
         ind_loja = st.checkbox("[:material/Shopping_Bag:]  Loja", value=True)
+    else:
+        ind_preco_zero = st.checkbox("[:material/Sell:] Preço Zerado", value=True)
 with c2:
     ind_grupo = st.pills(
         ":material/Group_Work: Grupo",
@@ -319,12 +318,11 @@ if iniciar_processamento:
             ] = "PESO"
         if sistema == "RPOne":
             df_merge = df.copy()
-            if df_extra is not None and not df_extra.empty:
-                df_merge = df_merge.merge(
-                    df_extra[["CodProduto", "ListaCodCaract"]],
-                    on="CodProduto",
-                    how="left",
-                )
+
+            df_merge = df_merge.rename(
+                columns={"MinVenda": "Atacado", "PrecoUnPd": "Lojas"}
+            )
+
             df_merge = (
                 df_merge[
                     [
@@ -334,10 +332,22 @@ if iniciar_processamento:
                         "Estoq",
                         "Fam",
                         "ListaCodCaract",
+                        "Atacado",
+                        "Lojas",
                     ]
                 ]
                 if "ListaCodCaract" in df_merge
-                else df_merge[["CodProduto", "TIPO", "Descricao", "Estoq", "Fam"]]
+                else df_merge[
+                    [
+                        "CodProduto",
+                        "TIPO",
+                        "Descricao",
+                        "Atacado",
+                        "Lojas",
+                        "Estoq",
+                        "Fam",
+                    ]
+                ]
             )
 
             if "ListaCodCaract" in df_merge.columns:
@@ -347,12 +357,15 @@ if iniciar_processamento:
                 ] = "PESO"
 
         # 3. Definição do Fornecedor e Família
-        if modo == "Atacado" and sistema == "AlterData":
-            padrao = "|".join(FORNECEDORES)
-            df_merge["Fornecedor"] = df_merge["Descricao"].str.extract(
-                f"({padrao})", flags=re.IGNORECASE, expand=False
-            )
-            df_merge["Fornecedor"] = df_merge["Fornecedor"].fillna("Outros")
+        if modo == "Atacado":
+            if sistema == "AlterData":
+                padrao = "|".join(FORNECEDORES)
+                df_merge["Fornecedor"] = df_merge["Descricao"].str.extract(
+                    f"({padrao})", flags=re.IGNORECASE, expand=False
+                )
+                df_merge["Fornecedor"] = df_merge["Fornecedor"].fillna("Outros")
+            else:
+                df_merge["Fornecedor"] = df_merge["Descricao"].str.split().str[-3]
         else:
             df_merge["Fornecedor"] = df_merge["Descricao"].str.split().str[-3]
 
@@ -363,13 +376,20 @@ if iniciar_processamento:
 
         # 4. Merge de Preços (Somente Atacado)
         if modo == "Atacado":
-            df_preco_pivot = df_preco.pivot(
-                index="CodProduto", columns="Tabela", values="Preco"
-            ).reset_index()
-            df_completo = df_merge.merge(df_preco_pivot, on="CodProduto", how="left")
-            df_completo = df_completo.rename(
-                columns={"SUGER": "Lojas", "PRATI": "Atacado"}
-            )
+
+            if sistema == "AlterData":
+                df_preco_pivot = df_preco.pivot(
+                    index="CodProduto", columns="Tabela", values="Preco"
+                ).reset_index()
+                df_completo = df_merge.merge(
+                    df_preco_pivot, on="CodProduto", how="left"
+                )
+                df_completo = df_completo.rename(
+                    columns={"SUGER": "Lojas", "PRATI": "Atacado"}
+                )
+
+            if sistema == "RPOne":
+                df_completo = df_merge.copy()
         else:
             df_completo = df_merge.copy()
 
@@ -383,6 +403,11 @@ if iniciar_processamento:
         df_completo = df_completo[df_completo["TIPO"].isin(ind_grupo)].copy()
         if ind_qtmin:
             df_completo = df_completo[df_completo["Estoq"] > ind_qtmin]
+
+        if modo == "Atacado" and ind_preco_zero:
+            df_completo = df_completo[
+                (df_completo["Atacado"] > 0) & (df_completo["Lojas"] > 0)
+            ]
 
         if df_completo.empty:
             st.error(":material/Cancel: Nenhum item selecionado após filtros")
@@ -510,12 +535,11 @@ if iniciar_processamento:
                     [
                         "CodProduto",
                         "Descricao",
-                        "Lojas_FMT",
                         "Atacado_FMT",
                         "Fornecedor",
                         "Estoq",
                     ]
-                ].rename(columns={"Lojas_FMT": "Lojas", "Atacado_FMT": "Atacado"}),
+                ].rename(columns={"Atacado_FMT": "Atacado"}),
                 hide_index=True,
             )
 
