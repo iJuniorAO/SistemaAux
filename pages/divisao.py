@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import re
 import io
+import zipfile
 from datetime import datetime
 from bancoDados import inicia_conexao_bancoDados, obter_lojas
 from utils import (
@@ -233,29 +234,67 @@ def extrai_qt_RPOne(df, df_produto_base):
 
 
 def criar_downloads_rpone(df_txt_dict, categoria, cod_cliente_map, doc_padrao):
-    """Cria botões de download no formato RP One (.apv)."""
+    """Cria botões de download no formato RP One (.apv) com opção de baixar todos em um arquivo .zip."""
     if not df_txt_dict:
         return st.info(f"Nenhum produto {categoria}")
 
     st.markdown(f"### :blue[{categoria}]", text_alignment="center")
-    for loja, df_loja in df_txt_dict.items():
-        loja_nome = loja.split("_")[0]
 
-        # Busca cod_cliente para esta loja
-        cod_cliente = cod_cliente_map.get(loja_nome, "")
+    arquivos_gerados = []
+    buffer_zip = io.BytesIO()
 
-        conteudo_arquivo = formata_pedido_rp(
-            df_loja, cod_cliente, doc_padrao, categoria
-        )
+    # 1. Pré-processa os arquivos e monta o arquivo .ZIP em memória
+    with zipfile.ZipFile(buffer_zip, "w", zipfile.ZIP_DEFLATED) as zf:
+        for loja, df_loja in df_txt_dict.items():
+            loja_nome = loja.split("_")[0]
+            cod_cliente = cod_cliente_map.get(loja_nome, "")
 
+            conteudo_arquivo = formata_pedido_rp(
+                df_loja, cod_cliente, doc_padrao, categoria
+            )
+
+            nome_arquivo = (
+                f"DIVISAO_{AGORA.strftime('%Y%m%d_%HH%MM')}_{loja}_{categoria}.apv"
+            )
+
+            # Escreve o arquivo no pacote ZIP
+            zf.writestr(nome_arquivo, conteudo_arquivo)
+
+            # Guarda os dados necessários para os botões individuais
+            arquivos_gerados.append(
+                {
+                    "loja_nome": loja_nome,
+                    "nome_arquivo": nome_arquivo,
+                    "conteudo": conteudo_arquivo,
+                    "loja_key": loja,
+                }
+            )
+
+    buffer_zip.seek(0)
+
+    # 2. Botão principal: Baixar tudo em um único arquivo .zip
+    st.download_button(
+        label=":material/folder_zip: Baixar Todos os Arquivos (.zip)",
+        data=buffer_zip,
+        file_name=f"TODOS_PEDIDOS_{AGORA.strftime('%Y%m%d_%HH%MM')}_{categoria}.zip",
+        mime="application/zip",
+        key=f"zip_{categoria}",
+        on_click="ignore",
+        use_container_width=True,
+    )
+
+    st.divider()
+
+    # 3. Botões individuais (item a item)
+    for item in arquivos_gerados:
         col1, col2 = st.columns(2, vertical_alignment="center")
-        col1.markdown(loja_nome)
+        col1.markdown(item["loja_nome"])
         col2.download_button(
-            label=f":material/Download: Baixar",
-            data=conteudo_arquivo,
-            file_name=f"DIVISAO_{AGORA.strftime('%Y%m%d_%HH%MM')}_{loja}_{categoria}.apv",
+            label=":material/Download: Baixar",
+            data=item["conteudo"],
+            file_name=item["nome_arquivo"],
             mime="text/plain",
-            key=f"rp_{categoria}_{loja}",
+            key=f"rp_{categoria}_{item['loja_key']}",
             on_click="ignore",
         )
 
@@ -833,7 +872,6 @@ with st.sidebar:
     st.space()
     st.markdown("### Produtos Base")
     st.write(f"Produtos cadastrados na memória: :blue[{produtos_cadastrados}]")
-    st.write(f"Sistema selecionado: :blue[{sistema}]")
     if link_produto:
         st.link_button("Acessar Arquivo Principal", link_produto)
     if sistema == "AlterData" and link_produto_extra:
