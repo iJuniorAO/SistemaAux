@@ -6,38 +6,67 @@ import io
 from datetime import datetime, timezone, timedelta
 
 
-@st.cache_data(
-    ttl=7200, show_spinner="Carregando dados txt", show_time=True, scope="session"
-)
+# -----------------------------------------------------------------------------
+# Auxiliar
+# -----------------------------------------------------------------------------
+def _tratar_url_onedrive(input_texto: str) -> str:
+    url_match = re.search(r'src="([^"]+)"', input_texto)
+    url = url_match.group(1) if url_match else input_texto
+
+    # 2. Ajuste para SharePoint Business
+    # Se for link de embed do SharePoint, mudamos para o modo de download
+    if "sharepoint.com" in url:
+
+        if "embed.aspx" in url:
+            # Transforma o link de embed em um link de ação de download
+            url = url.replace("embed.aspx", "download.aspx")
+        elif "download=1" not in url:
+            # Se for link de compartilhamento normal, força o download
+            url = url + ("&" if "?" in url else "?") + "download=1"
+    else:
+        # Caso seja OneDrive Pessoal
+        url = url.replace("embed", "download")
+    return url
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def obter_ultima_modificacao(url: str) -> str:
+    try:
+        resp = requests.head(url, allow_redirects=True, timeout=20)
+        # Tenta obter Last-Modified ou ETag como fallback de validação
+        return resp.headers.get("Last-Modified") or resp.headers.get("ETag") or ""
+    except Exception:
+        return ""
+
+
+# -----------------------------------------------------------------------------
+# Dados Completos
+# -----------------------------------------------------------------------------
+
+
+@st.cache_data(show_spinner="Baixando dados do OneDrive...", show_time=True)
+def _obter_dados_cached(url: str, last_modified: str):
+    response = requests.get(url, timeout=20)
+    response.raise_for_status()
+
+    # Ajuste automático ou forçado de encoding para TXT/CSV
+    response.encoding = response.apparent_encoding or "utf-8"
+
+    return response.text
+
+
+# -----------------------------------------------------------------------------
+# Funções Principais
+# -----------------------------------------------------------------------------
 def carregar_dados_onedrive(input_texto):
     try:
-        # 1. Limpeza: Se o usuário colou o <iframe>, extrai apenas a URL
-        url_match = re.search(r'src="([^"]+)"', input_texto)
-        url = url_match.group(1) if url_match else input_texto
+        url = _tratar_url_onedrive(input_texto)
+        data_modificacao = obter_ultima_modificacao(url)
 
-        # 2. Ajuste para SharePoint Business
-        # Se for link de embed do SharePoint, mudamos para o modo de download
-        if "sharepoint.com" in url:
+        # Ao passar data_modificacao para o cache, se ela mudar, o Streamlit re-executa a requisição get
+        texto = _obter_dados_cached(url, data_modificacao)
 
-            if "embed.aspx" in url:
-                # Transforma o link de embed em um link de ação de download
-                url = url.replace("embed.aspx", "download.aspx")
-            elif "download=1" not in url:
-                # Se for link de compartilhamento normal, força o download
-                url = url + ("&" if "?" in url else "?") + "download=1"
-        else:
-            # Caso seja OneDrive Pessoal
-            url = url.replace("embed", "download")
-
-        # 3. Faz a requisição
-        response = requests.get(url, timeout=20)
-
-        resp = requests.head(url, allow_redirects=True)
-        data_modificacao = resp.headers.get("Last-Modified")
-
-        response.raise_for_status()
-
-        return {"falha": False, "resp": response.text, "data": data_modificacao}
+        return {"falha": False, "resp": texto, "data": data_modificacao}
     except Exception as e:
         st.error(f"Erro ao processar URL: {e}")
         return {"falha": True, "resp": None, "data": None}

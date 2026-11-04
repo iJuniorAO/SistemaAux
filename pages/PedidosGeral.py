@@ -426,10 +426,7 @@ with tab1:
             f_extra_auto = response_extra["resp"]
 
         if sistema == "RPOne":
-            if "dados_onedrive_rp" not in st.session_state:
-                st.session_state.dados_onedrive_rp = carregar_dados_onedrive(
-                    link_produto
-                )
+            st.session_state.dados_onedrive_rp = carregar_dados_onedrive(link_produto)
 
             response = st.session_state.dados_onedrive_rp
             if response["falha"]:
@@ -473,19 +470,41 @@ if not LOJAS and not df_lojas.empty:
 elif not LOJAS:
     LOJAS = ["TESTE"]
 
-loja_pedido = st.selectbox(
-    ":red[Seleciona Loja]", LOJAS, index=None, placeholder="Seleciona a loja"
-)
+col_client1, col_client2 = st.columns([3, 1])
+with col_client1:
+    loja_pedido = st.selectbox(
+        ":red[Seleciona Loja]", LOJAS, index=None, placeholder="Seleciona a loja"
+    )
+
+with col_client2:
+    atacado_pedido = st.text_input(
+        ":red[Selecioa Atacado]", placeholder="Digite o código da loja"
+    )
+
 st.space()
 
 # --- GATILHO DE EXECUÇÃO ---
 liberado = (f_produto is not None or desativa_manual) and (f_pedido or f_pedido_atacado)
+tem_loja = bool(loja_pedido)
+tem_atacado = bool(atacado_pedido.strip())
+
+
 if liberado:
     if f_pedido and f_pedido_atacado:
-        st.error("Inserido Pedido Loja e Pedido Atacado - Informar somente 1")
+        st.error(
+            ":material/Priority_High: Inserido Pedido Loja e Pedido Atacado - Informar somente 1"
+        )
         st.stop()
-    if not loja_pedido:
-        st.error(":material/Priority_High: Selecione uma Loja")
+
+    if tem_loja and tem_atacado:
+        st.error(
+            ":material/priority_high: Preencha apenas Loja ou Atacado (não ambos)."
+        )
+        st.stop()
+    elif not tem_loja and not tem_atacado:
+        st.error(
+            ":material/priority_high: Informe ao menos uma opção: Loja ou Atacado."
+        )
         st.stop()
 
     # Prepara base
@@ -629,13 +648,18 @@ if liberado:
                         formato_arquivo = ".txt"
                         conteudo_arquivo = output.getvalue()
                     if sistema == "RPOne":
-                        cod_cliente = (
-                            df_lojas.loc[
-                                df_lojas["Filial"] == loja_pedido, "cod_cliente_loja"
-                            ].iloc[0]
-                            if not df_lojas.empty
-                            else ""
-                        )
+                        if loja_pedido:
+                            cod_cliente = (
+                                df_lojas.loc[
+                                    df_lojas["Filial"] == loja_pedido,
+                                    "cod_cliente_loja",
+                                ].iloc[0]
+                                if not df_lojas.empty
+                                else ""
+                            )
+                        if atacado_pedido:
+                            cod_cliente = atacado_pedido
+
                         conteudo_arquivo = formata_pedido_rp(
                             df_sub, cod_cliente, doc_padrao, tipo
                         )
