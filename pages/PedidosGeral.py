@@ -246,9 +246,9 @@ def confere_prazo_pedido():
 
 # FUNÇÃO UNIFICADA DE PROCESSAMENTO
 def processar_pedidos(df, df_extra, df_Pedido_Loja, sis_flag):
-    df = df[(df["Fam"] != 900000008) & (df["Estoq"] > 0)].copy()
 
     if sis_flag == "AlterData":
+        df = df[(df["Fam"] != 900000008) & (df["Estoq"] > 0)].copy()
         df = df[["CodProduto", "CodGrupo", "Descricao", "Estoq", "Fam"]]
         if df_extra is not None:
             df = df.merge(
@@ -265,6 +265,7 @@ def processar_pedidos(df, df_extra, df_Pedido_Loja, sis_flag):
         df["TIPO"] = np.select(CONDICOES, ["PESO", "CONG"], default="SECO")
 
     if sis_flag == "RPOne":
+        df = df[(df["Fam"].isna()) & (df["Estoq"] > 0)].copy()
         if df_extra is not None and not df_extra.empty:
             df = df.merge(
                 df_extra[["CodProduto", "ListaCodCaract"]], on="CodProduto", how="left"
