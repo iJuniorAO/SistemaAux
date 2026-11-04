@@ -368,10 +368,16 @@ if iniciar_processamento:
         else:
             df_merge["Fornecedor"] = df_merge["Descricao"].str.split().str[-3]
 
-        df_merge["FAMILIA"] = "-"
-        df_merge.loc[df_merge["Fam"] == 900000007, "FAMILIA"] = "LISTA"
-        df_merge.loc[df_merge["Fam"] == 900000008, "FAMILIA"] = "DIVISAO"
-        df_merge.loc[df_merge["Fam"] == 900000009, "FAMILIA"] = "LOJA"
+        if sistema == "AlterData":
+            df_merge.loc[df_merge["Fam"] == 900000007, "FAMILIA"] = "LISTA"
+            df_merge.loc[df_merge["Fam"] == 900000008, "FAMILIA"] = "DIVISAO"
+            df_merge.loc[df_merge["Fam"] == 900000009, "FAMILIA"] = "LOJA"
+        if sistema == "RPOne":
+            df_merge.loc[df_merge["Fam"].isna(), "FAMILIA"] = "LISTA"
+            df_merge.loc[
+                df_merge["Fam"].astype(str).str.contains("div", case=False, na=False),
+                "FAMILIA",
+            ] = "DIVISAO"
 
         # 4. Merge de Preços (Somente Atacado)
         if modo == "Atacado":
@@ -396,7 +402,8 @@ if iniciar_processamento:
         if ind_neg:
             df_completo = df_completo[df_completo["Estoq"] > 0].copy()
         if ind_div:
-            df_completo = df_completo[df_completo["Fam"] != 900000008].copy()
+            df_completo = df_completo[df_completo["FAMILIA"] == "LISTA"].copy()
+
         if modo == "Lista Comum" and ind_loja:
             df_completo = df_completo[df_completo["Fam"] != 900000009].copy()
         df_completo = df_completo[df_completo["TIPO"].isin(ind_grupo)].copy()
