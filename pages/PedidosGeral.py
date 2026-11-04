@@ -428,10 +428,7 @@ with tab1:
             f_extra_auto = response_extra["resp"]
 
         if sistema == "RPOne":
-            if "dados_onedrive_rp" not in st.session_state:
-                st.session_state.dados_onedrive_rp = carregar_dados_onedrive(
-                    link_produto
-                )
+            st.session_state.dados_onedrive_rp = carregar_dados_onedrive(link_produto)
 
             response = st.session_state.dados_onedrive_rp
             if response["falha"]:
