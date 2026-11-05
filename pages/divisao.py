@@ -628,7 +628,7 @@ if pode_processar:
     st.markdown("## Lojas")
     df_lojas = pd.DataFrame(todas_lojas["resposta"])
     df_lojas = df_lojas.drop(columns="id")
-    fator_porcentagem_total = df_lojas["fator_porcentagem"].sum()
+    fator_porcentagem_total = df_lojas["fator_porcentagem"].sum().round(4)
 
     if fator_porcentagem_total != 100.00:
         st.error(
