@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import re
 import io
+import json
 import pandas as pd
 from datetime import datetime, timezone, timedelta
 
@@ -180,7 +181,11 @@ def pandas_ler_excel(caminho_arquivo, colunas=None):
             return {"erro": True, "df": df}
 
 
-# Guia Cega Layout
+# -----------------------------------------------------------------------------
+# Guia Cega
+# -----------------------------------------------------------------------------
+
+
 def layout_guia_cega(resposta_xml):
 
     css_contraste_tabela = """
@@ -268,6 +273,152 @@ def validar_acesso(roles_permitidas=["administrador"]):
         st.stop()
 
 
+def set_cookies(cookies: dict, days=7):
+    """
+    Grava múltiplos cookies em uma única execução JavaScript
+    e recarrega a aplicação somente após finalizar.
+    """
+
+    dados = {}
+
+    for name, value in cookies.items():
+        if isinstance(value, (dict, list)):
+            value = json.dumps(value, ensure_ascii=False)
+
+        dados[str(name)] = str(value)
+
+    cookies_js = json.dumps(dados, ensure_ascii=False)
+    days_js = json.dumps(float(days))
+
+    js_code = f"""
+    <script>
+    (() => {{
+        const cookies = {cookies_js};
+        const days = {days_js};
+
+        const maxAge = Math.floor(days * 86400);
+
+        const secure = location.protocol === "https:"
+            ? "; Secure"
+            : "";
+
+        Object.entries(cookies).forEach(([name, value]) => {{
+            document.cookie =
+                encodeURIComponent(name) + "=" +
+                encodeURIComponent(value) +
+                "; Max-Age=" + maxAge +
+                "; Path=/; SameSite=Lax" + secure;
+        }});
+
+        console.log("Cookies gravados:", Object.keys(cookies));
+        window.setTimeout(() => window.location.reload(), 100);
+
+    }})();
+    </script>
+    """
+
+    st.html(js_code, unsafe_allow_javascript=True)
+
+
+def set_cookie(name, value, days=7):
+    """Grava um único cookie sem provocar reload."""
+
+    if isinstance(value, (dict, list)):
+        value = json.dumps(value, ensure_ascii=False)
+
+    name_js = json.dumps(str(name))
+    value_js = json.dumps(str(value))
+    days_js = json.dumps(float(days))
+
+    js_code = f"""
+    <script>
+    (() => {{
+        const secure = location.protocol === "https:"
+            ? "; Secure"
+            : "";
+
+        document.cookie =
+            encodeURIComponent({name_js}) + "=" +
+            encodeURIComponent({value_js}) +
+            "; Max-Age=" + Math.floor({days_js} * 86400) +
+            "; Path=/; SameSite=Lax" + secure;
+    }})();
+    </script>
+    """
+
+    st.html(js_code, unsafe_allow_javascript=True)
+
+
 def buscar_perfil_bd(supabase, user_id):
     response = supabase.table("perfis").select("*").eq("user_id", user_id).execute()
     return response.data[0] if response.data else None
+
+
+def delete_cookie(name):
+    name_js = json.dumps(str(name))
+
+    js_code = f"""
+    <script>
+    (() => {{
+        document.cookie =
+            {name_js} + "=; Max-Age=0; Path=/; SameSite=Lax";
+    }})();
+    </script>
+    """
+
+    st.html(js_code, unsafe_allow_javascript=True)
+
+
+def delete_cookies(names):
+    names_js = json.dumps([str(name) for name in names])
+
+    js_code = f"""
+    <script>
+    (() => {{
+        {{}};
+        const names = {names_js};
+
+        names.forEach(name => {{
+            document.cookie =
+                encodeURIComponent(name) +
+                "=; Max-Age=0; Path=/; SameSite=Lax";
+        }});
+
+        window.setTimeout(() => window.location.reload(), 100);
+
+    }})();
+    </script>
+    """
+
+    st.html(js_code, unsafe_allow_javascript=True)
+
+
+def log_off():
+    st.session_state.pop("user", None)
+    st.session_state.pop("session", None)
+    st.session_state.pop("perfil", None)
+    delete_cookies(["sb_access_token", "sb_refresh_token", "perfil"])
+    st.session_state.perfil = {"role": "client"}
+
+
+def restore_session(supabase):
+    """Restaura a sessão usando os tokens persistidos nos cookies."""
+    if st.session_state.get("user") is None:
+        access_token = st.context.cookies.get("sb_access_token")
+        refresh_token = st.context.cookies.get("sb_refresh_token")
+
+        if access_token and refresh_token:
+            try:
+                res = supabase.auth.set_session(access_token, refresh_token)
+                if res.user:
+                    perfil = buscar_perfil_bd(supabase, res.user.id)
+                    if perfil is None:
+                        raise ValueError("Perfil do usuário não encontrado.")
+
+                    st.session_state["user"] = res.user
+                    st.session_state["session"] = res.session
+                    st.session_state["perfil"] = perfil
+
+            except Exception as e:
+                st.error(f"Não foi possível restaurar a sessão: {e}")
+                log_off()
