@@ -1,8 +1,8 @@
 import streamlit as st
 import requests
 import re
-import pandas as pd
 import io
+import pandas as pd
 from datetime import datetime, timezone, timedelta
 
 
@@ -141,29 +141,6 @@ def abrir_arquivo_txt(arquivo, colunas=None):
         st.stop()
 
 
-def validar_acesso(roles_permitidas=["administrador"]):
-    # 1. Verifica se está logado
-    if st.session_state.get("perfil") == "none" or "perfil" not in st.session_state:
-        st.markdown("# :red[:material/lock:] ACESSO NEGADO")
-        st.text("É necessário realizar o login para continuar.")
-        if st.button("Ir para Login"):
-            st.switch_page("login.py")
-        st.stop()
-
-    perfil = st.session_state.perfil
-
-    if perfil.get("status") == "pendente":
-        st.warning("# :material/warning: USUÁRIO COM PENDÊNCIA")
-        st.text("Entrar em contato com a equipe técnica.")
-        st.stop()
-
-    # 3. Verifica permissão de nível
-    if perfil.get("role") not in roles_permitidas:
-        st.markdown("# :red[:material/block: ACESSO NEGADO]")
-        st.text("Seu usuário não possui permissão para esta página.")
-        st.stop()
-
-
 def ler_planilha(caminho_arquivo, colunas=None):
     """Lê o Excel e define os nomes das colunas conforme o notebook"""
 
@@ -261,3 +238,36 @@ def layout_guia_cega(resposta_xml):
         st.checkbox("Divisão")
 
     return df_log
+
+
+# -----------------------------------------------------------------------------
+# Acessos
+# -----------------------------------------------------------------------------
+
+
+def validar_acesso(roles_permitidas=["administrador"]):
+    # 1. Verifica se está logado
+    if st.session_state.get("perfil") == "none" or "perfil" not in st.session_state:
+        st.markdown("# :red[:material/lock:] ACESSO NEGADO")
+        st.text("É necessário realizar o login para continuar.")
+        if st.button("Ir para Login"):
+            st.switch_page("login.py")
+        st.stop()
+
+    perfil = st.session_state.perfil
+
+    if perfil.get("status") == "pendente":
+        st.warning("# :material/warning: USUÁRIO COM PENDÊNCIA")
+        st.text("Entrar em contato com a equipe técnica.")
+        st.stop()
+
+    # 3. Verifica permissão de nível
+    if perfil.get("role") not in roles_permitidas:
+        st.markdown("# :red[:material/block: ACESSO NEGADO]")
+        st.text("Seu usuário não possui permissão para esta página.")
+        st.stop()
+
+
+def buscar_perfil_bd(supabase, user_id):
+    response = supabase.table("perfis").select("*").eq("user_id", user_id).execute()
+    return response.data[0] if response.data else None

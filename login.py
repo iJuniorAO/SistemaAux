@@ -1,6 +1,6 @@
 import streamlit as st
-from supabase_auth.errors import AuthApiError
 from bancoDados import inicia_conexao_bancoDados, tratar_erros_supabase
+from utils import buscar_perfil_bd
 
 
 def realizar_login(email, senha):
@@ -39,16 +39,6 @@ def cadastrar_usuario(nome, email, senha, departamento):
 
     except Exception as e:
         st.error(f"Erro no processo de cadastro: {e}")
-
-
-def buscar_perfil_bd(user_id):
-    try:
-        res = supabase.table("perfis").select("*").eq("user_id", user_id).execute()
-        res = res.data[0]
-
-        return res
-    except:
-        return None
 
 
 def valida_senha(senha, senha_repetida):
@@ -146,11 +136,15 @@ if st.session_state.user is None:  # SEM LOGIN
             if st.form_submit_button("Entrar"):
                 usuario = realizar_login(email_log, senha_log)
                 if usuario:
-                    st.session_state.user = usuario.user
-                    st.session_state.session = usuario.session
-                    perfil = buscar_perfil_bd(st.session_state.user.id)
-                    st.session_state.perfil = perfil
-                    st.rerun()
+                    perfil = buscar_perfil_bd(supabase, usuario.user.id)
+                    if perfil is None:
+                        supabase.auth.sign_out()
+                        st.error("Não foi possível encontrar o perfil do usuários")
+                    else:
+                        st.session_state.user = usuario.user
+                        st.session_state.session = usuario.session
+                        st.session_state.perfil = perfil
+                        st.rerun()
     with tab_cadastro:
         st.write("Em desenvolvimento...")
     if False:  # CADASTRO
@@ -183,8 +177,6 @@ if st.session_state.user is None:  # SEM LOGIN
                 st.success("E-mail Enviado")
 
 else:  # LOGADO
-    # perfil = buscar_perfil_bd(st.session_state.user.id)
-    # st.session_state.perfil = perfil
     perfil = st.session_state.perfil
 
     with st.sidebar:
