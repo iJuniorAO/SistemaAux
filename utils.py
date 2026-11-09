@@ -310,12 +310,12 @@ def set_cookies(cookies: dict, days=7):
                 "; Path=/; SameSite=Lax" + secure;
         }});
 
-        console.log("Cookies gravados:", Object.keys(cookies));
-        window.setTimeout(() => window.location.reload(), 100);
 
     }})();
     </script>
     """
+    # console.log("Cookies gravados:", Object.keys(cookies));
+    # window.setTimeout(() => window.location.reload(), 100);
 
     st.html(js_code, unsafe_allow_javascript=True)
 
@@ -389,11 +389,11 @@ def delete_cookies(names):
                 "=; Max-Age=0; Path=/; SameSite=Lax";
         }});
 
-        window.setTimeout(() => window.location.reload(), 100);
 
     }})();
     </script>
     """
+    # window.setTimeout(() => window.location.reload(), 100);
 
     st.html(js_code, unsafe_allow_javascript=True)
 
