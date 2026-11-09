@@ -153,7 +153,6 @@ if st.session_state.user is None:  # SEM LOGIN
                             },
                             days=7,
                         )
-                st.rerun()
     with tab_cadastro:
         st.write("Em desenvolvimento...")
     if False:  # CADASTRO
