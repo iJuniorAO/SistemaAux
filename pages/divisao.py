@@ -7,6 +7,7 @@ import zipfile
 from datetime import datetime
 from bancoDados import inicia_conexao_bancoDados, obter_lojas
 from utils import (
+    restore_session,
     carregar_dados_onedrive,
     abrir_arquivo_txt,
     validar_acesso,
@@ -16,7 +17,6 @@ from utils import (
 if "perfil" not in st.session_state:
     st.session_state.perfil = "none"
 
-validar_acesso(["administrador", "usuario"])
 
 # --- CONSTANTES DE TEMPO (para formato RPOne) ---
 AGORA = datetime.now()
@@ -304,7 +304,11 @@ def criar_downloads_rpone(df_txt_dict, categoria, cod_cliente_map, doc_padrao):
 # ==============================================================================
 
 supabase = inicia_conexao_bancoDados()
+restore_session(supabase)
 todas_lojas = obter_lojas(supabase)
+
+validar_acesso(["administrador", "usuario"])
+
 
 if not todas_lojas["status"]:
     st.markdown("# :material/Close: Nâo é possível acessar as lojas")
