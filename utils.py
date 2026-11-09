@@ -350,8 +350,13 @@ def set_cookie(name, value, days=7):
 
 
 def buscar_perfil_bd(supabase, user_id):
-    response = supabase.table("perfis").select("*").eq("user_id", user_id).execute()
-    return response.data[0] if response.data else None
+    try:
+        response = supabase.table("perfis").select("*").eq("user_id", user_id).execute()
+        return response.data[0] if response.data else None
+    except Exception as e:
+        st.error("Erro: Não foi possivel realizar login")
+        print(e)
+        st.stop()
 
 
 def delete_cookie(name):
