@@ -310,7 +310,7 @@ def set_cookies(cookies: dict, days=7):
                 "; Path=/; SameSite=Lax" + secure;
         }});
 
-    window.setTimeout(() => window.location.reload(), 100);
+    window.setTimeout(() => window.location.reload(), 300);
 
     }})();
     </script>
