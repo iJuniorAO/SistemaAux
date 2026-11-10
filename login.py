@@ -118,13 +118,6 @@ def primeiro_acesso():
 
 st.set_page_config(page_title="Sistema de Acesso", layout="wide")
 
-cookies = st.context.cookies
-
-st.write("--debbug cookies--")
-st.write("nomes", cookies.keys)
-st.write(st.write("acces"), cookies.get("sb_access_token"))
-st.write(st.write("refresh"), cookies.get("sb_refresh_token"))
-
 supabase = inicia_conexao_bancoDados()
 restore_session(supabase)
 
