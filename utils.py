@@ -290,7 +290,7 @@ def set_cookies(cookies: dict, days=7):
     cookies_js = json.dumps(dados, ensure_ascii=False)
     days_js = json.dumps(float(days))
 
-    js_code = f"""
+    js_code2 = f"""
     <script>
     (() => {{
         const cookies = {cookies_js};
@@ -315,6 +315,33 @@ def set_cookies(cookies: dict, days=7):
     }})();
     </script>
     """
+
+    js_code = f"""
+        <script>
+        (() => {{
+            const cookies = {cookies_js};
+            const days = {days_js};
+            const maxAge = Math.floor(days * 86400);
+
+            // Em HTTPS (produção), usa Secure e SameSite=Lax (ou SameSite=None se estiver em iframe)
+            const isHttps = location.protocol === "https:";
+            const secureAttr = isHttps ? "; Secure" : "";
+            const sameSiteAttr = isHttps ? "; SameSite=None" : "; SameSite=Lax";
+
+            Object.entries(cookies).forEach(([name, value]) => {{
+                document.cookie =
+                    encodeURIComponent(name) + "=" +
+                    encodeURIComponent(value) +
+                    "; Max-Age=" + maxAge +
+                    "; Path=/" +
+                    sameSiteAttr +
+                    secureAttr;
+            }});
+
+            window.setTimeout(() => window.location.reload(), 150);
+        }})();
+        </script>
+        """
     # console.log("Cookies gravados:", Object.keys(cookies));
 
     st.html(js_code, unsafe_allow_javascript=True)
