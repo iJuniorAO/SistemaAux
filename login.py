@@ -1,6 +1,7 @@
 import streamlit as st
 from bancoDados import inicia_conexao_bancoDados, tratar_erros_supabase
 from utils import buscar_perfil_bd, delete_cookies, restore_session, set_cookies
+import extra_streamlit_components as stx
 
 
 def realizar_login(email, senha):
@@ -119,6 +120,9 @@ def primeiro_acesso():
 st.set_page_config(page_title="Sistema de Acesso", layout="wide")
 
 supabase = inicia_conexao_bancoDados()
+cookie_manager = stx.CookieManager(key="cookie_manager_main")
+cookies = cookie_manager.get_all()
+st.write(cookies)
 restore_session(supabase)
 
 if "user" not in st.session_state:
