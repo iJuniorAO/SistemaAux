@@ -409,7 +409,7 @@ def log_off():
 def restore_session(supabase):
     """Restaura a sessão usando os tokens persistidos nos cookies."""
 
-    st.write(st.context)
+    st.write(st.context.cookies)
     if st.session_state.get("user") is None:
         access_token = st.context.cookies.get("sb_access_token")
         refresh_token = st.context.cookies.get("sb_refresh_token")
