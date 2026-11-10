@@ -412,6 +412,9 @@ def restore_session(supabase):
         access_token = st.context.cookies.get("sb_access_token")
         refresh_token = st.context.cookies.get("sb_refresh_token")
 
+        st.write(st.context.cookies)
+        st.write("access\n", access_token, "\nRefresh\n", refresh_token)
+
         if access_token and refresh_token:
             try:
                 res = supabase.auth.set_session(access_token, refresh_token)
